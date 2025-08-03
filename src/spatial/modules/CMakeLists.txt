@@ -7,6 +7,7 @@ endif()
 add_subdirectory(osm)
 add_subdirectory(shapefile)
 add_subdirectory(mvt)
+add_subdirectory(vec)
 
 set(EXTENSION_SOURCES
     ${EXTENSION_SOURCES}

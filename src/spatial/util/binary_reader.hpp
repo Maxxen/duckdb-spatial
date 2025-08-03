@@ -25,6 +25,11 @@ public:
 		return value;
 	}
 
+	template<class T>
+	T Read(bool le) {
+		return le ? Read<T>() : ReadBE<T>();
+	}
+
 	template <class T>
 	T ReadBE() {
 		static_assert(std::is_trivially_copyable<T>::value, "Type must be trivially copyable");

@@ -52,6 +52,10 @@ public:
 		return end;
 	}
 
+	size_t GetWrittenSize() const {
+		return ptr - beg;
+	}
+
 private:
 	void CheckSize(const size_t size) const {
 		if (ptr + size > end) {
