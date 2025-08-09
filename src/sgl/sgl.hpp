@@ -158,6 +158,13 @@ struct extent_xy {
 		        {std::numeric_limits<double>::lowest(), std::numeric_limits<double>::lowest()}};
 	}
 
+	void union_with(const extent_xy &other) {
+		min.x = math::min(min.x, other.min.x);
+		min.y = math::min(min.y, other.min.y);
+		max.x = math::max(max.x, other.max.x);
+		max.y = math::max(max.y, other.max.y);
+	}
+
 	bool contains(const vertex_xy &other) const {
 		return (min.x <= other.x && max.x >= other.x && min.y <= other.y && max.y >= other.y);
 	}
