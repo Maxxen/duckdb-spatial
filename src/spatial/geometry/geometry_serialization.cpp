@@ -141,7 +141,7 @@ static void SerializeRecursive(BinaryWriter &cursor, const sgl::geometry *geom, 
 		throw InvalidInputException("Cannot serialize geometry of type %d", static_cast<int>(type));
 	}
 
-	// The GeometryType enum used to start with POINT = 0
+	// The SpatialGeometryType enum used to start with POINT = 0
 	// but now it starts with INVALID = 0, so we need to subtract 1
 	cursor.Write<uint32_t>(static_cast<uint32_t>(type) - 1);
 
@@ -213,7 +213,7 @@ void Serde::Serialize(const sgl::geometry &geom, char *buffer, size_t buffer_siz
 		throw InvalidInputException("Cannot serialize geometry of type INVALID");
 	}
 
-	// The GeometryType enum used to start with POINT = 0
+	// The SpatialGeometryType enum used to start with POINT = 0
 	// but now it starts with INVALID = 0, so we need to subtract 1
 	cursor.Write<uint8_t>(static_cast<uint8_t>(type) - 1);
 	cursor.Write<uint8_t>(flags);

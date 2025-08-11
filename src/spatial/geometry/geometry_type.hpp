@@ -11,7 +11,7 @@
 
 namespace duckdb {
 
-enum class GeometryType : uint8_t {
+enum class SpatialGeometryType : uint8_t {
 	POINT = 0,
 	LINESTRING,
 	POLYGON,
@@ -22,36 +22,36 @@ enum class GeometryType : uint8_t {
 };
 
 struct GeometryTypes {
-	static bool IsSinglePart(GeometryType type) {
-		return type == GeometryType::POINT || type == GeometryType::LINESTRING;
+	static bool IsSinglePart(SpatialGeometryType type) {
+		return type == SpatialGeometryType::POINT || type == SpatialGeometryType::LINESTRING;
 	}
 
-	static bool IsMultiPart(GeometryType type) {
-		return type == GeometryType::POLYGON || type == GeometryType::MULTIPOINT ||
-		       type == GeometryType::MULTILINESTRING || type == GeometryType::MULTIPOLYGON ||
-		       type == GeometryType::GEOMETRYCOLLECTION;
+	static bool IsMultiPart(SpatialGeometryType type) {
+		return type == SpatialGeometryType::POLYGON || type == SpatialGeometryType::MULTIPOINT ||
+		       type == SpatialGeometryType::MULTILINESTRING || type == SpatialGeometryType::MULTIPOLYGON ||
+		       type == SpatialGeometryType::GEOMETRYCOLLECTION;
 	}
 
-	static bool IsCollection(GeometryType type) {
-		return type == GeometryType::MULTIPOINT || type == GeometryType::MULTILINESTRING ||
-		       type == GeometryType::MULTIPOLYGON || type == GeometryType::GEOMETRYCOLLECTION;
+	static bool IsCollection(SpatialGeometryType type) {
+		return type == SpatialGeometryType::MULTIPOINT || type == SpatialGeometryType::MULTILINESTRING ||
+		       type == SpatialGeometryType::MULTIPOLYGON || type == SpatialGeometryType::GEOMETRYCOLLECTION;
 	}
 
-	static string ToString(GeometryType type) {
+	static string ToString(SpatialGeometryType type) {
 		switch (type) {
-		case GeometryType::POINT:
+		case SpatialGeometryType::POINT:
 			return "POINT";
-		case GeometryType::LINESTRING:
+		case SpatialGeometryType::LINESTRING:
 			return "LINESTRING";
-		case GeometryType::POLYGON:
+		case SpatialGeometryType::POLYGON:
 			return "POLYGON";
-		case GeometryType::MULTIPOINT:
+		case SpatialGeometryType::MULTIPOINT:
 			return "MULTIPOINT";
-		case GeometryType::MULTILINESTRING:
+		case SpatialGeometryType::MULTILINESTRING:
 			return "MULTILINESTRING";
-		case GeometryType::MULTIPOLYGON:
+		case SpatialGeometryType::MULTIPOLYGON:
 			return "MULTIPOLYGON";
-		case GeometryType::GEOMETRYCOLLECTION:
+		case SpatialGeometryType::GEOMETRYCOLLECTION:
 			return "GEOMETRYCOLLECTION";
 		default:
 			return StringUtil::Format("UNKNOWN(%d)", static_cast<int>(type));
@@ -85,9 +85,9 @@ public:
 		return data;
 	}
 
-	GeometryType GetType() const {
+	SpatialGeometryType GetType() const {
 		// return the type
-		const auto type = Load<GeometryType>(const_data_ptr_cast(data.GetPrefix()));
+		const auto type = Load<SpatialGeometryType>(const_data_ptr_cast(data.GetPrefix()));
 		const auto props = Load<GeometryProperties>(const_data_ptr_cast(data.GetPrefix() + 1));
 		props.CheckVersion();
 		return type;
@@ -104,7 +104,7 @@ public:
 		Cursor cursor(data);
 
 		// Read the header
-		auto header_type = cursor.Read<GeometryType>();
+		auto header_type = cursor.Read<SpatialGeometryType>();
 		auto properties = cursor.Read<GeometryProperties>();
 		auto hash = cursor.Read<uint16_t>();
 		(void)hash;
@@ -123,7 +123,7 @@ public:
 			return true;
 		}
 
-		if (header_type == GeometryType::POINT) {
+		if (header_type == SpatialGeometryType::POINT) {
 			cursor.Skip(4); // skip padding
 
 			// Read the point

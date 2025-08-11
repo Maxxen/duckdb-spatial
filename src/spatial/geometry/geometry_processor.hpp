@@ -105,8 +105,8 @@ private:
 	bool has_z = false;
 	bool has_m = false;
 	uint32_t nesting_level = 0;
-	GeometryType current_type = GeometryType::POINT;
-	GeometryType parent_type = GeometryType::POINT;
+	SpatialGeometryType current_type = SpatialGeometryType::POINT;
+	SpatialGeometryType parent_type = SpatialGeometryType::POINT;
 
 protected:
 	bool HasZ() const {
@@ -121,10 +121,10 @@ protected:
 	uint32_t NestingLevel() const {
 		return nesting_level;
 	}
-	GeometryType CurrentType() const {
+	SpatialGeometryType CurrentType() const {
 		return current_type;
 	}
-	GeometryType ParentType() const {
+	SpatialGeometryType ParentType() const {
 		return parent_type;
 	}
 
@@ -225,11 +225,11 @@ public:
 		has_m = props.HasM();
 		nesting_level = 0;
 		current_type = geom.GetType();
-		parent_type = GeometryType::POINT;
+		parent_type = SpatialGeometryType::POINT;
 
 		Cursor cursor(geom);
 
-		cursor.Skip<GeometryType>();
+		cursor.Skip<SpatialGeometryType>();
 		cursor.Skip<GeometryProperties>();
 		cursor.Skip<uint16_t>();
 		cursor.Skip<uint32_t>();
@@ -247,25 +247,25 @@ private:
 		auto type = cursor.Peek<SerializedGeometryType>();
 		switch (type) {
 		case SerializedGeometryType::POINT:
-			current_type = GeometryType::POINT;
+			current_type = SpatialGeometryType::POINT;
 			return ReadPoint(cursor, args...);
 		case SerializedGeometryType::LINESTRING:
-			current_type = GeometryType::LINESTRING;
+			current_type = SpatialGeometryType::LINESTRING;
 			return ReadLineString(cursor, args...);
 		case SerializedGeometryType::POLYGON:
-			current_type = GeometryType::POLYGON;
+			current_type = SpatialGeometryType::POLYGON;
 			return ReadPolygon(cursor, args...);
 		case SerializedGeometryType::MULTIPOINT:
-			current_type = GeometryType::MULTIPOINT;
+			current_type = SpatialGeometryType::MULTIPOINT;
 			return ReadCollection(cursor, args...);
 		case SerializedGeometryType::MULTILINESTRING:
-			current_type = GeometryType::MULTILINESTRING;
+			current_type = SpatialGeometryType::MULTILINESTRING;
 			return ReadCollection(cursor, args...);
 		case SerializedGeometryType::MULTIPOLYGON:
-			current_type = GeometryType::MULTIPOLYGON;
+			current_type = SpatialGeometryType::MULTIPOLYGON;
 			return ReadCollection(cursor, args...);
 		case SerializedGeometryType::GEOMETRYCOLLECTION:
-			current_type = GeometryType::GEOMETRYCOLLECTION;
+			current_type = SpatialGeometryType::GEOMETRYCOLLECTION;
 			return ReadCollection(cursor, args...);
 		default:
 			throw SerializationException("Unknown geometry type (%ud)", static_cast<uint32_t>(type));

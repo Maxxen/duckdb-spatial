@@ -1328,19 +1328,19 @@ public:
 	void ProcessCollection(CollectionState &state, bool) override {
 		bool collection_is_typed = false;
 		switch (CurrentType()) {
-		case GeometryType::MULTIPOINT:
+		case SpatialGeometryType::MULTIPOINT:
 			text += "MULTIPOINT";
 			collection_is_typed = true;
 			break;
-		case GeometryType::MULTILINESTRING:
+		case SpatialGeometryType::MULTILINESTRING:
 			text += "MULTILINESTRING";
 			collection_is_typed = true;
 			break;
-		case GeometryType::MULTIPOLYGON:
+		case SpatialGeometryType::MULTIPOLYGON:
 			text += "MULTIPOLYGON";
 			collection_is_typed = true;
 			break;
-		case GeometryType::GEOMETRYCOLLECTION:
+		case SpatialGeometryType::GEOMETRYCOLLECTION:
 			text += "GEOMETRYCOLLECTION";
 			collection_is_typed = false;
 			break;

@@ -3912,7 +3912,7 @@ struct ST_GeometryType {
 	static unique_ptr<FunctionData> Bind(ClientContext &context, ScalarFunction &bound_function,
 	                                     vector<unique_ptr<Expression>> &arguments) {
 		// Create an enum type for all geometry types
-		// Ensure that these are in the same order as the GeometryType enum
+		// Ensure that these are in the same order as the SpatialGeometryType enum
 		const vector<string> enum_values = {"POINT", "LINESTRING", "POLYGON", "MULTIPOINT", "MULTILINESTRING",
 		                                    "MULTIPOLYGON", "GEOMETRYCOLLECTION",
 		                                    // or...
