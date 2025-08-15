@@ -3,6 +3,7 @@
 #include <cmath>
 #include "duckdb/common/typedefs.hpp"
 #include "duckdb/common/assert.hpp"
+#include "duckdb/common/types/geometry.hpp"
 
 namespace duckdb {
 
@@ -148,7 +149,7 @@ public:
 };
 
 // TODO: Deprecate these for the generic PointXY, PointXYZ, PointXYM, PointXYZM instead
-enum class VertexType : uint8_t { XY, XYZ, XYM, XYZM };
+
 struct VertexXY : public PointXY<double> {
 	static const constexpr VertexType TYPE = VertexType::XY;
 	static const constexpr bool IS_VERTEX = true;

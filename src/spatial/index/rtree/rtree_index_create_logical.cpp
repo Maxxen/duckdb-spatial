@@ -54,7 +54,7 @@ static PhysicalOperator &CreateNullFilter(PhysicalPlanGenerator &generator, cons
 	auto &is_empty_entry = catalog.GetEntry(context, CatalogType::SCALAR_FUNCTION_ENTRY, DEFAULT_SCHEMA, "ST_IsEmpty")
 	                           .Cast<ScalarFunctionCatalogEntry>();
 
-	auto is_empty_func = is_empty_entry.functions.GetFunctionByArguments(context, {GeoTypes::GEOMETRY()});
+	auto is_empty_func = is_empty_entry.functions.GetFunctionByArguments(context, {LogicalType::GEOMETRY()});
 	vector<unique_ptr<Expression>> is_empty_args;
 	is_empty_args.push_back(std::move(bound_ref));
 	auto is_empty_expr = make_uniq_base<Expression, BoundFunctionExpression>(LogicalType::BOOLEAN, is_empty_func,
@@ -79,9 +79,9 @@ static PhysicalOperator &CreateBoundingBoxProjection(PhysicalPlanGenerator &plan
 	auto &bbox_func_entry =
 	    catalog.GetEntry(context, CatalogType::SCALAR_FUNCTION_ENTRY, DEFAULT_SCHEMA, "ST_Extent_Approx")
 	        .Cast<ScalarFunctionCatalogEntry>();
-	auto bbox_func = bbox_func_entry.functions.GetFunctionByArguments(context, {GeoTypes::GEOMETRY()});
+	auto bbox_func = bbox_func_entry.functions.GetFunctionByArguments(context, {LogicalType::GEOMETRY()});
 
-	auto geom_ref_expr = make_uniq_base<Expression, BoundReferenceExpression>(GeoTypes::GEOMETRY(), 0);
+	auto geom_ref_expr = make_uniq_base<Expression, BoundReferenceExpression>(LogicalType::GEOMETRY(), 0);
 	vector<unique_ptr<Expression>> bbox_args;
 	bbox_args.push_back(std::move(geom_ref_expr));
 
@@ -151,7 +151,7 @@ PhysicalOperator &RTreeIndex::CreatePlan(PlanIndexInput &input) {
 	auto &expr = op.unbound_expressions[0];
 
 	// Validate that we have the right type of expression (float array)
-	if (expr->return_type != GeoTypes::GEOMETRY()) {
+	if (expr->return_type.id() != LogicalTypeId::GEOMETRY) {
 		throw BinderException("RTree indexes can only be created over GEOMETRY columns.");
 	}
 
@@ -218,7 +218,7 @@ PhysicalOperator &LogicalCreateRTreeIndex::CreatePlan(ClientContext &context, Ph
 	auto &expr = op.unbound_expressions[0];
 
 	// Validate that we have the right type of expression (float array)
-	if (expr->return_type != GeoTypes::GEOMETRY()) {
+	if (expr->return_type.id() != LogicalTypeId::GEOMETRY) {
 		throw BinderException("RTree indexes can only be created over GEOMETRY columns.");
 	}
 

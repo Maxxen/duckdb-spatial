@@ -457,10 +457,10 @@ struct ST_Transform {
 			});
 
 			func.AddVariant([&](ScalarFunctionVariantBuilder &variant) {
-				variant.AddParameter("geom", GeoTypes::GEOMETRY());
+				variant.AddParameter("geom", LogicalType::GEOMETRY());
 				variant.AddParameter("source_crs", LogicalType::VARCHAR);
 				variant.AddParameter("target_crs", LogicalType::VARCHAR);
-				variant.SetReturnType(GeoTypes::GEOMETRY());
+				variant.SetReturnType(LogicalType::GEOMETRY());
 
 				variant.SetInit(ProjFunctionLocalState::Init);
 				variant.SetBind(Bind);
@@ -468,11 +468,11 @@ struct ST_Transform {
 			});
 
 			func.AddVariant([&](ScalarFunctionVariantBuilder &variant) {
-				variant.AddParameter("geom", GeoTypes::GEOMETRY());
+				variant.AddParameter("geom", LogicalType::GEOMETRY());
 				variant.AddParameter("source_crs", LogicalType::VARCHAR);
 				variant.AddParameter("target_crs", LogicalType::VARCHAR);
 				variant.AddParameter("always_xy", LogicalType::BOOLEAN);
-				variant.SetReturnType(GeoTypes::GEOMETRY());
+				variant.SetReturnType(LogicalType::GEOMETRY());
 
 				variant.SetInit(ProjFunctionLocalState::Init);
 				variant.SetBind(Bind);
@@ -684,7 +684,7 @@ struct ST_Area_Spheroid {
 	static void Register(ExtensionLoader &loader) {
 		FunctionBuilder::RegisterScalar(loader, "ST_Area_Spheroid", [](ScalarFunctionBuilder &func) {
 			func.AddVariant([](ScalarFunctionVariantBuilder &variant) {
-				variant.AddParameter("geom", GeoTypes::GEOMETRY());
+				variant.AddParameter("geom", LogicalType::GEOMETRY());
 				variant.SetReturnType(LogicalType::DOUBLE);
 
 				variant.SetInit(GeodesicLocalState::InitPolygon);
@@ -840,7 +840,7 @@ struct ST_Perimeter_Spheroid {
 	static void Register(ExtensionLoader &loader) {
 		FunctionBuilder::RegisterScalar(loader, "ST_Perimeter_Spheroid", [](ScalarFunctionBuilder &func) {
 			func.AddVariant([](ScalarFunctionVariantBuilder &variant) {
-				variant.AddParameter("geom", GeoTypes::GEOMETRY());
+				variant.AddParameter("geom", LogicalType::GEOMETRY());
 				variant.SetReturnType(LogicalType::DOUBLE);
 
 				variant.SetInit(GeodesicLocalState::InitPolygon);
@@ -974,7 +974,7 @@ struct ST_Length_Spheroid {
 	static void Register(ExtensionLoader &loader) {
 		FunctionBuilder::RegisterScalar(loader, "ST_Length_Spheroid", [](ScalarFunctionBuilder &func) {
 			func.AddVariant([](ScalarFunctionVariantBuilder &variant) {
-				variant.AddParameter("geom", GeoTypes::GEOMETRY());
+				variant.AddParameter("geom", LogicalType::GEOMETRY());
 				variant.SetReturnType(LogicalType::DOUBLE);
 
 				variant.SetInit(GeodesicLocalState::InitLine);

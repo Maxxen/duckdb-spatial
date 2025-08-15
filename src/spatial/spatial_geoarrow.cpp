@@ -43,13 +43,13 @@ struct GeoArrowWKB {
 
 		const auto format = string(schema.format);
 		if (format == "z") {
-			return make_uniq<ArrowType>(GeoTypes::GEOMETRY(),
+			return make_uniq<ArrowType>(LogicalType::GEOMETRY(),
 			                            make_uniq<ArrowStringInfo>(ArrowVariableSizeType::NORMAL));
 		} else if (format == "Z") {
-			return make_uniq<ArrowType>(GeoTypes::GEOMETRY(),
+			return make_uniq<ArrowType>(LogicalType::GEOMETRY(),
 			                            make_uniq<ArrowStringInfo>(ArrowVariableSizeType::SUPER_SIZE));
 		} else if (format == "vz") {
-			return make_uniq<ArrowType>(GeoTypes::GEOMETRY(), make_uniq<ArrowStringInfo>(ArrowVariableSizeType::VIEW));
+			return make_uniq<ArrowType>(LogicalType::GEOMETRY(), make_uniq<ArrowStringInfo>(ArrowVariableSizeType::VIEW));
 		}
 		throw InvalidInputException("Arrow extension type \"%s\" not supported for geoarrow.wkb", format.c_str());
 	}
@@ -115,7 +115,7 @@ struct GeoArrowWKB {
 void RegisterArrowExtensions(DBConfig &config) {
 	config.RegisterArrowExtension(
 	    {"geoarrow.wkb", GeoArrowWKB::PopulateSchema, GeoArrowWKB::GetType,
-	     make_shared_ptr<ArrowTypeExtensionData>(GeoTypes::GEOMETRY(), LogicalType::BLOB, GeoArrowWKB::ArrowToDuck,
+	     make_shared_ptr<ArrowTypeExtensionData>(LogicalType::GEOMETRY(), LogicalType::BLOB, GeoArrowWKB::ArrowToDuck,
 	                                             GeoArrowWKB::DuckToArrow)});
 }
 
@@ -140,7 +140,7 @@ void GeoArrowRegisterScan(ClientContext &context, TableFunctionInput &data_p, Da
 	}
 
 	DBConfig &config = DatabaseInstance::GetDatabase(context).config;
-	if (config.HasArrowExtension(GeoTypes::GEOMETRY())) {
+	if (config.HasArrowExtension(LogicalType::GEOMETRY())) {
 		output.SetValue(0, 0, false);
 	} else {
 		RegisterArrowExtensions(config);

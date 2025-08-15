@@ -153,7 +153,7 @@ struct ST_TileEnvelope {
 				variant.AddParameter("tile_zoom", LogicalType::INTEGER);
 				variant.AddParameter("tile_x", LogicalType::INTEGER);
 				variant.AddParameter("tile_y", LogicalType::INTEGER);
-				variant.SetReturnType(GeoTypes::GEOMETRY());
+				variant.SetReturnType(LogicalType::GEOMETRY());
 				variant.SetInit(LocalState::Init);
 				variant.SetFunction(ExecuteWebMercator);
 			});

@@ -728,7 +728,7 @@ struct ST_Read : ArrowTableFunction {
 				if (result->keep_wkb) {
 					return_types.emplace_back(GeoTypes::WKB_BLOB());
 				} else {
-					return_types.emplace_back(GeoTypes::GEOMETRY());
+					return_types.emplace_back(LogicalType::GEOMETRY());
 					if (column_name == "wkb_geometry") {
 						column_name = "geom";
 					}
@@ -894,7 +894,6 @@ struct ST_Read : ArrowTableFunction {
 				const auto wkb_len = wkb.GetSize();
 
 				sgl::geometry geom;
-				;
 
 				if (!wkb_reader.try_parse(geom, wkb_ptr, wkb_len)) {
 					const auto error = wkb_reader.get_error_message();
@@ -979,7 +978,7 @@ struct ST_Read : ArrowTableFunction {
 					// Found a geometry column
 					// Convert the WKB columns to a geometry column
 
-					Vector geom_vec(GeoTypes::GEOMETRY(), output_size);
+					Vector geom_vec(LogicalType::GEOMETRY(), output_size);
 					state.ConvertWKB(output.data[col_idx], geom_vec, output_size);
 
 					output.data[col_idx].ReferenceAndSetType(geom_vec);
@@ -1616,7 +1615,7 @@ struct ST_Write {
 	};
 
 	static bool IsGeometryType(const LogicalType &type) {
-		return type == GeoTypes::WKB_BLOB() || type == GeoTypes::POINT_2D() || type == GeoTypes::GEOMETRY();
+		return type == GeoTypes::WKB_BLOB() || type == GeoTypes::POINT_2D() || type == LogicalType::GEOMETRY();
 	}
 
 	static unique_ptr<OGRFieldDefn> OGRFieldTypeFromLogicalType(const string &name, const LogicalType &type) {
@@ -1798,7 +1797,7 @@ struct ST_Write {
 			return OGRGeometryUniquePtr(ptr);
 		}
 
-		if (type == GeoTypes::GEOMETRY()) {
+		if (type == LogicalType::GEOMETRY()) {
 			const auto blob = value.GetValueUnsafe<string_t>();
 			uint32_t size;
 			const auto wkb = WKBWriter::Write(blob, &size, arena);

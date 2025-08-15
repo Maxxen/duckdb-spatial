@@ -143,7 +143,7 @@ void RegisterSpatialAggregateFunctions(ExtensionLoader &loader) {
 
 	// TODO: Dont use geometry_t here
 	const auto agg = AggregateFunction::UnaryAggregate<ExtentAggState, string_t, string_t, ExtentAggFunction>(
-	    GeoTypes::GEOMETRY(), GeoTypes::GEOMETRY());
+	    LogicalType::GEOMETRY(), LogicalType::GEOMETRY());
 
 	FunctionBuilder::RegisterAggregate(loader, "ST_Extent_Agg", [&](AggregateFunctionBuilder &func) {
 		func.SetFunction(agg);

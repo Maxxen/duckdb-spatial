@@ -403,7 +403,7 @@ struct ST_ReadSHP {
 		}
 
 		// Always return geometry last
-		return_types.push_back(GeoTypes::GEOMETRY());
+		return_types.push_back(LogicalType::GEOMETRY());
 		names.push_back("geom");
 
 		// Deduplicate field names if necessary
@@ -829,7 +829,7 @@ struct ST_ReadSHP {
 			const auto projected_col_idx = gstate.column_ids[col_idx];
 
 			auto &col_vec = output.data[col_idx];
-			if (col_vec.GetType() == GeoTypes::GEOMETRY()) {
+			if (col_vec.GetType() == LogicalType::GEOMETRY()) {
 				ConvertGeometryVector(col_vec, record_start, output_size, gstate.shp_handle.get(), gstate.arena,
 				                      bind_data.shape_type);
 			} else {

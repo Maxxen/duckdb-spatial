@@ -141,8 +141,8 @@ static void InsertSpatialJoin(OptimizerExtensionInput &input, unique_ptr<Logical
 		}
 
 		// The function must operate on two GEOMETRY types
-		if (func.children[0]->return_type != GeoTypes::GEOMETRY() ||
-		    func.children[1]->return_type != GeoTypes::GEOMETRY()) {
+		if (func.children[0]->return_type.id() != LogicalTypeId::GEOMETRY ||
+		    func.children[1]->return_type.id() != LogicalTypeId::GEOMETRY) {
 			extra_predicates.push_back(std::move(expr));
 			continue;
 		}

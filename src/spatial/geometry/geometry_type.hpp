@@ -7,6 +7,7 @@
 #include "spatial/util/cursor.hpp"
 
 #include "duckdb/common/type_util.hpp"
+#include "spatial/util/binary_reader.hpp"
 #include "spatial/util/math.hpp"
 
 namespace duckdb {
@@ -101,6 +102,19 @@ public:
 	}
 
 	bool TryGetCachedBounds(Box2D<float> &bbox) const {
+		auto extent = GeometryExtent::Empty();
+		if (Geometry::GetExtent(data, extent) != 0) {
+			bbox.min.x = MathUtil::DoubleToFloatDown(extent.min_x);
+			bbox.min.y = MathUtil::DoubleToFloatDown(extent.min_y);
+			bbox.max.x = MathUtil::DoubleToFloatUp(extent.max_x);
+			bbox.max.y = MathUtil::DoubleToFloatUp(extent.max_y);
+			return true;
+		}
+		return false;
+	}
+
+	/*
+	bool TryGetCachedBounds(Box2D<float> &bbox) const {
 		Cursor cursor(data);
 
 		// Read the header
@@ -147,6 +161,7 @@ public:
 		}
 		return false;
 	}
+	*/
 };
 
 template <>

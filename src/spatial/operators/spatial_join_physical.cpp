@@ -483,12 +483,12 @@ public:
 
 		auto &catalog = Catalog::GetSystemCatalog(context);
 		auto &entry = catalog.GetEntry<ScalarFunctionCatalogEntry>(context, DEFAULT_SCHEMA, "ST_IsEmpty");
-		auto func = entry.functions.GetFunctionByArguments(context, {GeoTypes::GEOMETRY()});
+		auto func = entry.functions.GetFunctionByArguments(context, {LogicalType::GEOMETRY()});
 
 		auto is_empty_expr = make_uniq<BoundFunctionExpression>(LogicalTypeId::BOOLEAN, func,
 		                                                        vector<unique_ptr<Expression>> {}, nullptr);
 		is_empty_expr->children.push_back(
-		    make_uniq_base<Expression, BoundReferenceExpression>(GeoTypes::GEOMETRY(), 0));
+		    make_uniq_base<Expression, BoundReferenceExpression>(LogicalType::GEOMETRY(), 0));
 
 		auto is_not_empty_expr =
 		    make_uniq<BoundOperatorExpression>(ExpressionType::OPERATOR_NOT, LogicalTypeId::BOOLEAN);
@@ -497,7 +497,7 @@ public:
 		auto is_not_null_expr =
 		    make_uniq<BoundOperatorExpression>(ExpressionType::OPERATOR_IS_NOT_NULL, LogicalTypeId::BOOLEAN);
 		is_not_null_expr->children.push_back(
-		    make_uniq_base<Expression, BoundReferenceExpression>(GeoTypes::GEOMETRY(), 0));
+		    make_uniq_base<Expression, BoundReferenceExpression>(LogicalType::GEOMETRY(), 0));
 
 		auto filter_expr = make_uniq_base<Expression, BoundConjunctionExpression>(
 		    ExpressionType::CONJUNCTION_AND, std::move(is_not_empty_expr), std::move(is_not_null_expr));
@@ -612,7 +612,7 @@ SinkFinalizeType PhysicalSpatialJoin::Finalize(Pipeline &pipeline, Event &event,
 	Vector row_pointer_vector(LogicalType::POINTER, reinterpret_cast<data_ptr_t>(rows_ptr));
 
 	auto &sel = *FlatVector::IncrementalSelectionVector();
-	Vector geom_vec(GeoTypes::GEOMETRY());
+	Vector geom_vec(LogicalType::GEOMETRY());
 
 	do {
 		const auto row_count = iterator.GetCurrentChunkCount();

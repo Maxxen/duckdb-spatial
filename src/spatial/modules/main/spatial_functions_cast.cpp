@@ -171,7 +171,7 @@ struct GeometryCasts {
 	//------------------------------------------------------------------------------------------------------------------
 	static void Register(ExtensionLoader &loader) {
 		const auto wkb_type = GeoTypes::WKB_BLOB();
-		const auto geom_type = GeoTypes::GEOMETRY();
+		const auto geom_type = LogicalType::GEOMETRY();
 
 		// VARCHAR -> Geometry is explicitly castable
 		loader.RegisterCastFunction(geom_type, LogicalType::VARCHAR, BoundCastInfo(ToVarcharCast), 1);
@@ -393,16 +393,16 @@ struct PointCasts {
 		// POINT_3D -> VARCHAR
 		loader.RegisterCastFunction(GeoTypes::POINT_3D(), LogicalType::VARCHAR, BoundCastInfo(ToVarcharCast3D), 1);
 		// POINT_2D -> GEOMETRY
-		loader.RegisterCastFunction(GeoTypes::POINT_2D(), GeoTypes::GEOMETRY(),
+		loader.RegisterCastFunction(GeoTypes::POINT_2D(), LogicalType::GEOMETRY(),
 		                            BoundCastInfo(ToGeometryCast, nullptr, LocalState::InitCast), 1);
 		// POINT_3D -> GEOMETRY
-		loader.RegisterCastFunction(GeoTypes::POINT_3D(), GeoTypes::GEOMETRY(),
+		loader.RegisterCastFunction(GeoTypes::POINT_3D(), LogicalType::GEOMETRY(),
 		                            BoundCastInfo(ToGeometryCast3D, nullptr, LocalState::InitCast), 1);
 		// GEOMETRY -> POINT_2D
-		loader.RegisterCastFunction(GeoTypes::GEOMETRY(), GeoTypes::POINT_2D(),
+		loader.RegisterCastFunction(LogicalType::GEOMETRY(), GeoTypes::POINT_2D(),
 		                            BoundCastInfo(FromGeometryCast, nullptr, LocalState::InitCast), 1);
 		// GEOMETRY -> POINT_3D
-		loader.RegisterCastFunction(GeoTypes::GEOMETRY(), GeoTypes::POINT_3D(),
+		loader.RegisterCastFunction(LogicalType::GEOMETRY(), GeoTypes::POINT_3D(),
 		                            BoundCastInfo(FromGeometryCast3D, nullptr, LocalState::InitCast), 1);
 		// POINT_3D -> POINT_2D
 		loader.RegisterCastFunction(GeoTypes::POINT_3D(), GeoTypes::POINT_2D(), ToPoint2DCast, 1);
@@ -412,10 +412,10 @@ struct PointCasts {
 		// POINT_4D -> POINT_2D
 		loader.RegisterCastFunction(GeoTypes::POINT_4D(), GeoTypes::POINT_2D(), ToPoint2DCast, 1);
 		// POINT_4D -> GEOMETRY
-		loader.RegisterCastFunction(GeoTypes::POINT_4D(), GeoTypes::GEOMETRY(),
+		loader.RegisterCastFunction(GeoTypes::POINT_4D(), LogicalType::GEOMETRY(),
 		                            BoundCastInfo(ToGeometryCast4D, nullptr, LocalState::InitCast), 1);
 		// GEOMETRY -> POINT_4D
-		loader.RegisterCastFunction(GeoTypes::GEOMETRY(), GeoTypes::POINT_4D(),
+		loader.RegisterCastFunction(LogicalType::GEOMETRY(), GeoTypes::POINT_4D(),
 		                            BoundCastInfo(FromGeometryCast4D, nullptr, LocalState::InitCast), 1);
 	}
 };
@@ -608,16 +608,16 @@ struct LinestringCasts {
 		// LINESTRING_3D -> VARCHAR
 		loader.RegisterCastFunction(GeoTypes::LINESTRING_3D(), LogicalType::VARCHAR, BoundCastInfo(ToVarcharCast3D), 1);
 		// LINESTRING_2D -> GEOMETRY
-		loader.RegisterCastFunction(GeoTypes::LINESTRING_2D(), GeoTypes::GEOMETRY(),
+		loader.RegisterCastFunction(GeoTypes::LINESTRING_2D(), LogicalType::GEOMETRY(),
 		                            BoundCastInfo(ToGeometryCast, nullptr, LocalState::InitCast), 1);
 		// LINESTRING_3D -> GEOMETRY
-		loader.RegisterCastFunction(GeoTypes::LINESTRING_3D(), GeoTypes::GEOMETRY(),
+		loader.RegisterCastFunction(GeoTypes::LINESTRING_3D(), LogicalType::GEOMETRY(),
 		                            BoundCastInfo(ToGeometryCast3D, nullptr, LocalState::InitCast), 1);
 		// GEOMETRY -> LINESTRING_2D
-		loader.RegisterCastFunction(GeoTypes::GEOMETRY(), GeoTypes::LINESTRING_2D(),
+		loader.RegisterCastFunction(LogicalType::GEOMETRY(), GeoTypes::LINESTRING_2D(),
 		                            BoundCastInfo(FromGeometryCast, nullptr, LocalState::InitCast), 1);
 		// GEOMETRY -> LINESTRING_3D
-		loader.RegisterCastFunction(GeoTypes::GEOMETRY(), GeoTypes::LINESTRING_3D(),
+		loader.RegisterCastFunction(LogicalType::GEOMETRY(), GeoTypes::LINESTRING_3D(),
 		                            BoundCastInfo(FromGeometryCast3D, nullptr, LocalState::InitCast), 1);
 		// LINESTRING_3D -> LINESTRING_2D
 		loader.RegisterCastFunction(GeoTypes::LINESTRING_3D(), GeoTypes::LINESTRING_2D(), ToLine2DCast, 1);
@@ -872,16 +872,16 @@ struct PolygonCasts {
 		// POLYGON_3D -> VARCHAR
 		loader.RegisterCastFunction(GeoTypes::POLYGON_3D(), LogicalType::VARCHAR, BoundCastInfo(ToVarcharCast3D), 1);
 		// POLYGON_2D -> GEOMETRY
-		loader.RegisterCastFunction(GeoTypes::POLYGON_2D(), GeoTypes::GEOMETRY(),
+		loader.RegisterCastFunction(GeoTypes::POLYGON_2D(), LogicalType::GEOMETRY(),
 		                            BoundCastInfo(ToGeometryCast, nullptr, LocalState::InitCast), 1);
 		// POLYGON_3D -> GEOMETRY
-		loader.RegisterCastFunction(GeoTypes::POLYGON_3D(), GeoTypes::GEOMETRY(),
+		loader.RegisterCastFunction(GeoTypes::POLYGON_3D(), LogicalType::GEOMETRY(),
 		                            BoundCastInfo(ToGeometryCast3D, nullptr, LocalState::InitCast), 1);
 		// GEOMETRY -> POLYGON_2D
-		loader.RegisterCastFunction(GeoTypes::GEOMETRY(), GeoTypes::POLYGON_2D(),
+		loader.RegisterCastFunction(LogicalType::GEOMETRY(), GeoTypes::POLYGON_2D(),
 		                            BoundCastInfo(FromGeometryCast, nullptr, LocalState::InitCast), 1);
 		// GEOMETRY -> POLYGON_3D
-		loader.RegisterCastFunction(GeoTypes::GEOMETRY(), GeoTypes::POLYGON_3D(),
+		loader.RegisterCastFunction(LogicalType::GEOMETRY(), GeoTypes::POLYGON_3D(),
 		                            BoundCastInfo(FromGeometryCast3D, nullptr, LocalState::InitCast), 1);
 		// POLYGON_3D -> POLYGON_2D
 		loader.RegisterCastFunction(GeoTypes::POLYGON_3D(), GeoTypes::POLYGON_2D(), ToPolygon2DCast, 1);
@@ -955,11 +955,11 @@ struct BoxCasts {
 		loader.RegisterCastFunction(GeoTypes::BOX_2D(), LogicalType::VARCHAR, BoundCastInfo(ToVarcharCast), 1);
 
 		// BOX_2D -> GEOMETRY
-		loader.RegisterCastFunction(GeoTypes::BOX_2D(), GeoTypes::GEOMETRY(),
+		loader.RegisterCastFunction(GeoTypes::BOX_2D(), LogicalType::GEOMETRY(),
 		                            BoundCastInfo(ToGeometryCast2D, nullptr, LocalState::InitCast), 1);
 
 		// BOX_2F -> GEOMETRY
-		loader.RegisterCastFunction(GeoTypes::BOX_2DF(), GeoTypes::GEOMETRY(),
+		loader.RegisterCastFunction(GeoTypes::BOX_2DF(), LogicalType::GEOMETRY(),
 		                            BoundCastInfo(ToGeometryCast2F, nullptr, LocalState::InitCast), 1);
 	}
 };
@@ -1192,202 +1192,9 @@ void CoreVectorOperations::Box2DToVarchar(Vector &source, Vector &result, idx_t 
 //------------------------------------------------------------------------------
 // GEOMETRY -> VARCHAR
 //------------------------------------------------------------------------------
-namespace {
-class GeometryTextProcessor final : GeometryProcessor<void, bool> {
-private:
-	string text;
-
-public:
-	void OnVertexData(const VertexData &data) {
-		auto &dims = data.data;
-		auto &strides = data.stride;
-		auto count = data.count;
-
-		if (HasZ() && HasM()) {
-			for (uint32_t i = 0; i < count; i++) {
-				auto x = Load<double>(dims[0] + i * strides[0]);
-				auto y = Load<double>(dims[1] + i * strides[1]);
-				auto z = Load<double>(dims[2] + i * strides[2]);
-				auto m = Load<double>(dims[3] + i * strides[3]);
-				text += MathUtil::format_coord(x, y, z, m);
-				if (i < count - 1) {
-					text += ", ";
-				}
-			}
-		} else if (HasZ()) {
-			for (uint32_t i = 0; i < count; i++) {
-				auto x = Load<double>(dims[0] + i * strides[0]);
-				auto y = Load<double>(dims[1] + i * strides[1]);
-				auto zm = Load<double>(dims[2] + i * strides[2]);
-				text += MathUtil::format_coord(x, y, zm);
-				if (i < count - 1) {
-					text += ", ";
-				}
-			}
-		} else if (HasM()) {
-			for (uint32_t i = 0; i < count; i++) {
-				auto x = Load<double>(dims[0] + i * strides[0]);
-				auto y = Load<double>(dims[1] + i * strides[1]);
-				auto m = Load<double>(dims[3] + i * strides[3]);
-				text += MathUtil::format_coord(x, y, m);
-				if (i < count - 1) {
-					text += ", ";
-				}
-			}
-		} else {
-			for (uint32_t i = 0; i < count; i++) {
-				auto x = Load<double>(dims[0] + i * strides[0]);
-				auto y = Load<double>(dims[1] + i * strides[1]);
-				text += MathUtil::format_coord(x, y);
-
-				if (i < count - 1) {
-					text += ", ";
-				}
-			}
-		}
-	}
-
-	void ProcessPoint(const VertexData &data, bool in_typed_collection) override {
-		if (!in_typed_collection) {
-			text += "POINT";
-			if (HasZ() && HasM()) {
-				text += " ZM";
-			} else if (HasZ()) {
-				text += " Z";
-			} else if (HasM()) {
-				text += " M";
-			}
-			text += " ";
-		}
-
-		if (data.count == 0) {
-			text += "EMPTY";
-		} else if (in_typed_collection) {
-			OnVertexData(data);
-		} else {
-			text += "(";
-			OnVertexData(data);
-			text += ")";
-		}
-	}
-
-	void ProcessLineString(const VertexData &data, bool in_typed_collection) override {
-		if (!in_typed_collection) {
-			text += "LINESTRING";
-			if (HasZ() && HasM()) {
-				text += " ZM";
-			} else if (HasZ()) {
-				text += " Z";
-			} else if (HasM()) {
-				text += " M";
-			}
-			text += " ";
-		}
-
-		if (data.count == 0) {
-			text += "EMPTY";
-		} else {
-			text += "(";
-			OnVertexData(data);
-			text += ")";
-		}
-	}
-
-	void ProcessPolygon(PolygonState &state, bool in_typed_collection) override {
-		if (!in_typed_collection) {
-			text += "POLYGON";
-			if (HasZ() && HasM()) {
-				text += " ZM";
-			} else if (HasZ()) {
-				text += " Z";
-			} else if (HasM()) {
-				text += " M";
-			}
-			text += " ";
-		}
-
-		if (state.RingCount() == 0) {
-			text += "EMPTY";
-		} else {
-			text += "(";
-			bool first = true;
-			while (!state.IsDone()) {
-				if (!first) {
-					text += ", ";
-				}
-				first = false;
-				text += "(";
-				auto vertices = state.Next();
-				OnVertexData(vertices);
-				text += ")";
-			}
-			text += ")";
-		}
-	}
-
-	void ProcessCollection(CollectionState &state, bool) override {
-		bool collection_is_typed = false;
-		switch (CurrentType()) {
-		case SpatialGeometryType::MULTIPOINT:
-			text += "MULTIPOINT";
-			collection_is_typed = true;
-			break;
-		case SpatialGeometryType::MULTILINESTRING:
-			text += "MULTILINESTRING";
-			collection_is_typed = true;
-			break;
-		case SpatialGeometryType::MULTIPOLYGON:
-			text += "MULTIPOLYGON";
-			collection_is_typed = true;
-			break;
-		case SpatialGeometryType::GEOMETRYCOLLECTION:
-			text += "GEOMETRYCOLLECTION";
-			collection_is_typed = false;
-			break;
-		default:
-			throw InvalidInputException("Invalid geometry type");
-		}
-
-		if (HasZ() && HasM()) {
-			text += " ZM";
-		} else if (HasZ()) {
-			text += " Z";
-		} else if (HasM()) {
-			text += " M";
-		}
-
-		if (state.ItemCount() == 0) {
-			text += " EMPTY";
-		} else {
-			text += " (";
-			bool first = true;
-			while (!state.IsDone()) {
-				if (!first) {
-					text += ", ";
-				}
-				first = false;
-				state.Next(collection_is_typed);
-			}
-			text += ")";
-		}
-	}
-
-	virtual ~GeometryTextProcessor() = default;
-
-	const string &Execute(const geometry_t &geom) {
-		text.clear();
-		Process(geom, false);
-		return text;
-	}
-};
-
-} // namespace
-
 void CoreVectorOperations::GeometryToVarchar(Vector &source, Vector &result, idx_t count) {
-	GeometryTextProcessor processor;
-	UnaryExecutor::Execute<geometry_t, string_t>(source, result, count, [&](const geometry_t &input) {
-		const auto text = processor.Execute(input);
-		return StringVector::AddString(result, text);
+	UnaryExecutor::Execute<string_t, string_t>(source, result, count, [&](const string_t &input) {
+		return Geometry::ToString(result, input.GetData(), input.GetSize());
 	});
 }
 

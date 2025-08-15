@@ -9,8 +9,228 @@
 
 namespace duckdb {
 
-// TODO: Make non-recursive
 
+//----------------------------------------------------------------------------------------------------------------------
+// Get Required Size
+//----------------------------------------------------------------------------------------------------------------------
+size_t Serde::GetRequiredSize(const sgl::geometry &geom) {
+	const auto vertex_width = geom.get_vertex_width();
+
+	switch (geom.get_type()) {
+		case sgl::geometry_type::POINT: {
+			return 1 + 4 + vertex_width;
+		}
+		case sgl::geometry_type::LINESTRING: {
+			const auto vertex_count = geom.get_vertex_count();
+			return 1 + 4 + 4 + vertex_count * vertex_width;
+		}
+		case sgl::geometry_type::POLYGON: {
+			uint32_t total_size = 1 + 4 + 4;
+			const auto tail = geom.get_last_part();
+			if (!tail) {
+				return total_size;
+			}
+			auto part = tail;
+			do {
+				part = part->get_next();
+				total_size += 4 + part->get_vertex_count() * vertex_width;
+			} while (part != tail);
+			return total_size;
+		}
+		case sgl::geometry_type::MULTI_POINT:
+		case sgl::geometry_type::MULTI_LINESTRING:
+		case sgl::geometry_type::MULTI_POLYGON:
+		case sgl::geometry_type::GEOMETRY_COLLECTION: {
+			uint32_t total_size = 1 + 4 + 4;
+			const auto tail = geom.get_last_part();
+			if (!tail) {
+				return total_size;
+			}
+			auto part = tail;
+			do {
+				part = part->get_next();
+				total_size += GetRequiredSize(*part);
+			} while (part != tail);
+			return total_size;
+		}
+		default:
+			return 0;
+	}
+}
+
+//----------------------------------------------------------------------------------------------------------------------
+// Serialize
+//----------------------------------------------------------------------------------------------------------------------
+static void SerializeInternal(BinaryWriter &writer, const sgl::geometry &geom) {
+
+	const auto type = geom.get_type();
+	const auto has_z = geom.has_z();
+	const auto has_m = geom.has_m();
+	const auto vertex_width = geom.get_vertex_width();
+	const auto type_id = static_cast<uint32_t>(type) + (has_z ? 1000 : 0) + (has_m ? 2000 : 0);
+
+	writer.Write<uint8_t>(1);
+	writer.Write<uint32_t>(type_id);
+
+	switch (geom.get_type()) {
+		case sgl::geometry_type::POINT: {
+			if (geom.is_empty()) {
+				constexpr auto nan = std::numeric_limits<double>::quiet_NaN();
+				constexpr sgl::vertex_xyzm empty_vertex = { nan, nan, nan, nan};
+				writer.Copy(reinterpret_cast<const char*>(&empty_vertex), vertex_width);
+			} else {
+				writer.Copy(geom.get_vertex_array(), vertex_width);
+			}
+		} break;
+		case sgl::geometry_type::LINESTRING: {
+			const auto vertex_count = geom.get_vertex_count();
+			writer.Write<uint32_t>(vertex_count);
+			writer.Copy(geom.get_vertex_array(), vertex_count * vertex_width);
+		} break;
+		case sgl::geometry_type::POLYGON: {
+			const auto part_count = geom.get_part_count();
+			writer.Write<uint32_t>(part_count);
+			const auto tail = geom.get_last_part();
+			if (!tail) {
+				return;
+			}
+			auto part = tail;
+			do {
+				part = part->get_next();
+				writer.Write<uint32_t>(part->get_vertex_count());
+				writer.Copy(part->get_vertex_array(), part->get_vertex_width());
+			} while (part != tail);
+		} break;
+		case sgl::geometry_type::MULTI_POINT:
+		case sgl::geometry_type::MULTI_LINESTRING:
+		case sgl::geometry_type::MULTI_POLYGON:
+		case sgl::geometry_type::GEOMETRY_COLLECTION: {
+			const auto part_count = geom.get_part_count();
+			writer.Write<uint32_t>(part_count);
+			const auto tail = geom.get_last_part();
+			if (!tail) {
+				return;
+			}
+			auto part = tail;
+			do {
+				part = part->get_next();
+				SerializeInternal(writer, *part);
+			} while (part != tail);
+		}
+		default:
+			break;
+	}
+}
+
+void Serde::Serialize(const sgl::geometry &geom, char *buffer, size_t buffer_size) {
+	BinaryWriter writer(buffer, buffer_size);
+	SerializeInternal(writer, geom);
+}
+
+//----------------------------------------------------------------------------------------------------------------------
+// Deserialize
+//----------------------------------------------------------------------------------------------------------------------
+template<class GEOM_TYPE>
+static void OptionallyPrepare(GEOM_TYPE *geom, ArenaAllocator &arena) {
+	// Do nothing
+}
+
+template<>
+void OptionallyPrepare<sgl::prepared_geometry>(sgl::prepared_geometry *geom, ArenaAllocator &arena) {
+	GeometryAllocator alloc(arena);
+	geom->build(alloc);
+	geom->set_prepared(true);
+}
+
+
+template<class GEOM_TYPE>
+static void DeserializeInternal(BinaryReader &reader, GEOM_TYPE &result, ArenaAllocator &arena) {
+	const auto le = reader.Read<uint8_t>();
+	if (le != 1) {
+		throw InvalidInputException("Geometry is not little endian WKB!");
+	}
+	const auto type_id = reader.Read<uint32_t>();
+	const auto type = static_cast<sgl::geometry_type>(type_id % 1000);
+	const auto has_z = (type_id / 1000) % 2 == 1;
+	const auto has_m = (type_id / 2000) % 2 == 1;
+
+	result.set_type(type);
+	result.set_z(has_z);
+	result.set_m(has_m);
+
+	const auto vertex_width = result.get_vertex_width();
+
+	switch (type) {
+		case sgl::geometry_type::POINT: {
+			constexpr auto nan = std::numeric_limits<double>::quiet_NaN();
+			constexpr auto empty_vertex = sgl::vertex_xyzm{nan, nan, nan, nan};
+
+			const auto vertex_array = reader.Reserve(vertex_width);
+			if (memcmp(vertex_array, &empty_vertex, vertex_width) != 0) {
+				result.set_vertex_array(vertex_array, 1);
+			}
+		} break;
+		case sgl::geometry_type::LINESTRING: {
+			const auto vertex_count = reader.Read<uint32_t>();
+			if (vertex_count != 0) {
+				const auto vertex_array = reader.Reserve(vertex_count * vertex_width);
+				result.set_vertex_array(vertex_array, vertex_count);
+			}
+		} break;
+		case sgl::geometry_type::POLYGON: {
+			const auto part_count = reader.Read<uint32_t>();
+			for (uint32_t part_index = 0; part_index < part_count; part_index++) {
+				const auto part_mem = arena.AllocateAligned(sizeof(GEOM_TYPE));
+				const auto part_ptr = new (part_mem) GEOM_TYPE(sgl::geometry_type::LINESTRING, has_z, has_m);
+
+				const auto vertex_count = reader.Read<uint32_t>();
+				if (vertex_count != 0) {
+					const auto vertex_array = reader.Reserve(vertex_count * vertex_width);
+					part_ptr->set_vertex_array(vertex_array, vertex_count);
+				}
+
+				// If this is a prepared geometry, we need to prepare it
+				OptionallyPrepare(part_ptr, arena);
+
+				result.append_part(part_ptr);
+			}
+		} break;
+		case sgl::geometry_type::MULTI_POINT:
+		case sgl::geometry_type::MULTI_LINESTRING:
+		case sgl::geometry_type::MULTI_POLYGON:
+		case sgl::geometry_type::GEOMETRY_COLLECTION: {
+			const auto part_count = reader.Read<uint32_t>();
+			for (uint32_t part_index = 0; part_index < part_count; part_index++) {
+				const auto part_mem = arena.AllocateAligned(sizeof(GEOM_TYPE));
+				const auto part_ptr = new (part_mem) GEOM_TYPE();
+				DeserializeInternal(reader, *part_ptr, arena);
+				result.append_part(part_ptr);
+			}
+		} break;
+		default:
+			break;
+	}
+}
+
+void Serde::Deserialize(sgl::geometry &result, ArenaAllocator &arena, const char *buffer, size_t buffer_size) {
+	BinaryReader reader(buffer, buffer_size);
+	DeserializeInternal<sgl::geometry>(reader, result, arena);
+}
+
+
+//----------------------------------------------------------------------------------------------------------------------
+// Deserialize (Prepared Geometry)
+//----------------------------------------------------------------------------------------------------------------------
+void Serde::DeserializePrepared(sgl::prepared_geometry &result, ArenaAllocator &arena, const char *buffer,
+                                size_t buffer_size) {
+	BinaryReader reader(buffer, buffer_size);
+	DeserializeInternal<sgl::prepared_geometry>(reader, result, arena);
+}
+
+
+
+// TODO: Make non-recursive
+/*
 static size_t GetRequiredSizeInternal(const sgl::geometry *geom) {
 	const auto vertex_width = geom->get_vertex_width();
 
@@ -421,5 +641,5 @@ void Serde::DeserializePrepared(sgl::prepared_geometry &result, ArenaAllocator &
 	// Deserialize the geometry
 	DeserializePreparedRecursive(cursor, result, has_z, has_m, alloc);
 }
-
+*/
 } // namespace duckdb
