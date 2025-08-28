@@ -97,7 +97,7 @@ static void SerializeInternal(BinaryWriter &writer, const sgl::geometry &geom) {
 		do {
 			part = part->get_next();
 			writer.Write<uint32_t>(part->get_vertex_count());
-			writer.Copy(part->get_vertex_array(), part->get_vertex_width());
+			writer.Copy(part->get_vertex_array(), part->get_vertex_count() * part->get_vertex_width());
 		} while (part != tail);
 	} break;
 	case sgl::geometry_type::MULTI_POINT:
