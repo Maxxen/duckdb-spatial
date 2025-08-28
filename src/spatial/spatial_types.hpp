@@ -18,8 +18,10 @@ struct GeoTypes {
 	static LogicalType POLYGON_3D();
 	static LogicalType BOX_2D();
 	static LogicalType BOX_2DF();
-	//static LogicalType GEOMETRY();
 	static LogicalType WKB_BLOB();
+
+	// This used to be the old geometry type defined by the spatial extension, before it was added to core duckdb
+	static LogicalType EXTENSION_GEOMETRY();
 
 	static void Register(ExtensionLoader &loader);
 

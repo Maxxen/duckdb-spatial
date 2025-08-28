@@ -19,6 +19,10 @@ public:
 		return ptr >= end;
 	}
 
+	void Reset() {
+		ptr = beg;
+	}
+
 	template <class T>
 	T Read() {
 		static_assert(std::is_trivially_copyable<T>::value, "Type must be trivially copyable");

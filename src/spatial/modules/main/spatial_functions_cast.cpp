@@ -8,6 +8,8 @@
 #include "duckdb/common/operator/cast_operators.hpp"
 #include "duckdb/common/vector_operations/generic_executor.hpp"
 #include "duckdb/main/extension/extension_loader.hpp"
+#include "spatial/util/binary_reader.hpp"
+#include "spatial/util/binary_writer.hpp"
 
 namespace duckdb {
 
@@ -165,6 +167,161 @@ struct GeometryCasts {
 	}
 
 	//------------------------------------------------------------------------------------------------------------------
+	// Legacy Geometry Cast
+	//------------------------------------------------------------------------------------------------------------------
+	static void GetRequiredSize(BinaryReader &reader, uint32_t &total_size) {
+		reader.Skip(sizeof(uint8_t));
+		const auto flags = reader.Read<uint8_t>();
+		reader.Skip(sizeof(uint16_t));
+		reader.Skip(sizeof(uint32_t));
+
+		// Parse flags
+		const auto has_z = (flags & 0x01) != 0;
+		const auto has_m = (flags & 0x02) != 0;
+		const auto has_bbox = (flags & 0x04) != 0;
+
+		if (has_bbox) {
+			reader.Skip(sizeof(float) * 2 * (2 + has_z + has_m));
+		}
+
+		const auto vert_width = sizeof(double) * (2 + has_z + has_m);
+
+		while (!reader.IsAtEnd()) {
+			const auto type = static_cast<GeometryType>(reader.Read<uint32_t>() + 1);
+			switch (type) {
+				case GeometryType::POINT: {
+					const auto vert_count = reader.Read<uint32_t>();
+					reader.Skip(vert_count * vert_width);
+
+					total_size += 1 + 4 + vert_width;
+
+				} break;
+				case GeometryType::LINESTRING: {
+					const auto vert_count = reader.Read<uint32_t>();
+					reader.Skip(vert_count * vert_width);
+
+					total_size += 1 + 4 + 4 + vert_count * vert_width;
+				} break;
+				case GeometryType::POLYGON: {
+					total_size += 1 + 4 + 4;
+
+					const auto ring_count = reader.Read<uint32_t>();
+					auto ring_reader = reader;
+					reader.Skip((ring_count + (ring_count % 2)) * sizeof(uint32_t));
+
+					for (uint32_t ring_idx = 0; ring_idx < ring_count; ring_idx++) {
+						const auto vert_count = ring_reader.Read<uint32_t>();
+						reader.Skip(vert_count * vert_width);
+
+						total_size += 4 + vert_count * vert_width;
+					}
+				} break;
+				case GeometryType::MULTIPOINT:
+				case GeometryType::MULTILINESTRING:
+				case GeometryType::MULTIPOLYGON:
+				case GeometryType::GEOMETRYCOLLECTION: {
+					reader.Skip(sizeof(uint32_t));
+					total_size += 1 + 4 + 4;
+				} break;
+				default: {
+					throw InvalidInputException("Unsupported geometry type %d in legacy GEOMETRY",
+					                            static_cast<int>(type));
+				}
+			}
+		}
+	}
+
+	static void Convert(BinaryReader &reader, BinaryWriter &writer) {
+
+		reader.Skip(sizeof(uint8_t));
+		const auto flags = reader.Read<uint8_t>();
+		reader.Skip(sizeof(uint16_t));
+		reader.Skip(sizeof(uint32_t));
+
+		// Parse flags
+		const auto has_z = (flags & 0x01) != 0;
+		const auto has_m = (flags & 0x02) != 0;
+		const auto has_bbox = (flags & 0x04) != 0;
+
+		if (has_bbox) {
+			reader.Skip(sizeof(float) * 2 * (2 + has_z + has_m));
+		}
+
+		const auto vert_width = sizeof(double) * (2 + has_z + has_m);
+
+		while (!reader.IsAtEnd()) {
+			const auto type = static_cast<GeometryType>(reader.Read<uint32_t>() + 1);
+			const auto count = reader.Read<uint32_t>();
+
+			const auto type_id = static_cast<uint32_t>(type) + (has_z ? 1000 : 0) + (has_m ? 2000 : 0);
+
+			writer.Write<uint8_t>(1); // Little endian
+			writer.Write<uint32_t>(type_id); // type with flags
+
+			switch (type) {
+				case GeometryType::POINT: {
+					constexpr auto nan = std::numeric_limits<double>::quiet_NaN();
+					constexpr double empty_vertex[4] = {nan, nan, nan, nan};
+					if (count == 0) {
+						// Empty point
+						writer.Copy(reinterpret_cast<const char *>(empty_vertex), vert_width);
+					} else {
+						const auto vert_array = reader.Reserve(vert_width);
+						writer.Copy(vert_array, vert_width);
+					}
+				} break;
+				case GeometryType::LINESTRING: {
+					writer.Write<uint32_t>(count);
+					const auto vert_array = reader.Reserve(vert_width * count);
+					writer.Copy(vert_array, vert_width * count);
+				} break;
+				case GeometryType::POLYGON: {
+					writer.Write<uint32_t>(count);
+					auto ring_reader = reader;
+					reader.Skip((count + (count % 2)) * sizeof(uint32_t));
+					for (uint32_t ring_idx = 0; ring_idx < count; ring_idx++) {
+						const auto vert_count = ring_reader.Read<uint32_t>();
+						writer.Write<uint32_t>(vert_count);
+						const auto vert_array = reader.Reserve(vert_width * vert_count);
+						writer.Copy(vert_array, vert_width * vert_count);
+					}
+				} break;
+				case GeometryType::MULTIPOINT:
+				case GeometryType::MULTILINESTRING:
+				case GeometryType::MULTIPOLYGON:
+				case GeometryType::GEOMETRYCOLLECTION: {
+					writer.Write<uint32_t>(count);
+				} break;
+				default:
+					throw InvalidInputException("Unsupported geometry type %d in legacy GEOMETRY",
+					                            static_cast<int>(type));
+			}
+		}
+	}
+
+	static bool FromExtensionGeometry(Vector &source, Vector &result, idx_t count, CastParameters &params) {
+
+		UnaryExecutor::Execute<string_t, string_t>(
+		    source, result, count, [&](const string_t &input) {
+			    BinaryReader reader(input.GetDataUnsafe(), input.GetSize());
+
+				uint32_t total_size = 0;
+				GetRequiredSize(reader, total_size);
+
+		    	reader.Reset();
+
+				auto blob = StringVector::EmptyString(result, total_size);
+		    	BinaryWriter writer(blob.GetDataWriteable(), total_size);
+
+		    	Convert(reader, writer);
+
+		    	blob.Finalize();
+		    	return blob;
+		});
+		return true;
+	}
+
+	//------------------------------------------------------------------------------------------------------------------
 	// Register
 	//------------------------------------------------------------------------------------------------------------------
 	static void Register(ExtensionLoader &loader) {
@@ -189,6 +346,9 @@ struct GeometryCasts {
 
 		// WKB -> BLOB is implicitly castable
 		loader.RegisterCastFunction(wkb_type, LogicalType::BLOB, DefaultCasts::ReinterpretCast, 1);
+
+		// Always allow casts from extension geometry to the new geometry type for backwards compatability
+		loader.RegisterCastFunction(GeoTypes::EXTENSION_GEOMETRY(), geom_type, FromExtensionGeometry, 0);
 	}
 };
 
