@@ -8,7 +8,6 @@
 #include "geometry/geometry_serialization.hpp"
 #include "spatial/geometry/geometry_type.hpp"
 #include "spatial/geometry/sgl.hpp"
-#include "spatial/geometry/wkb_writer.hpp"
 #include "spatial/spatial_types.hpp"
 #include "yyjson.h"
 
@@ -49,7 +48,8 @@ struct GeoArrowWKB {
 			return make_uniq<ArrowType>(LogicalType::GEOMETRY(),
 			                            make_uniq<ArrowStringInfo>(ArrowVariableSizeType::SUPER_SIZE));
 		} else if (format == "vz") {
-			return make_uniq<ArrowType>(LogicalType::GEOMETRY(), make_uniq<ArrowStringInfo>(ArrowVariableSizeType::VIEW));
+			return make_uniq<ArrowType>(LogicalType::GEOMETRY(),
+			                            make_uniq<ArrowStringInfo>(ArrowVariableSizeType::VIEW));
 		}
 		throw InvalidInputException("Arrow extension type \"%s\" not supported for geoarrow.wkb", format.c_str());
 	}
@@ -106,9 +106,8 @@ struct GeoArrowWKB {
 	}
 
 	static void DuckToArrow(ClientContext &context, Vector &source, Vector &result, idx_t count) {
-		WKBWriter writer;
 		UnaryExecutor::Execute<geometry_t, string_t>(
-		    source, result, count, [&](const geometry_t &input) { return writer.Write(input, result); });
+		    source, result, count, [&](const geometry_t &input) { return Geometry::ToWKB(input, result); });
 	}
 };
 

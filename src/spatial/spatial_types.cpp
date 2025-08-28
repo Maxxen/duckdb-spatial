@@ -72,9 +72,9 @@ LogicalType GeoTypes::POLYGON_3D() {
 
 /*
 LogicalType GeoTypes::GEOMETRY() {
-	auto blob_type = LogicalType(LogicalTypeId::BLOB);
-	blob_type.SetAlias("GEOMETRY");
-	return blob_type;
+    auto blob_type = LogicalType(LogicalTypeId::BLOB);
+    blob_type.SetAlias("GEOMETRY");
+    return blob_type;
 }
 */
 

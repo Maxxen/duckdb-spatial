@@ -1022,7 +1022,8 @@ public:
 		column_ids.push_back(op.build_side_key_types.size() + op.build_side_payload_types.size());
 
 		// We dont need to keep the tuples aroun after scanning
-		state.collection->InitializeScan(scan_state, std::move(column_ids), TupleDataPinProperties::KEEP_EVERYTHING_PINNED);
+		state.collection->InitializeScan(scan_state, std::move(column_ids),
+		                                 TupleDataPinProperties::KEEP_EVERYTHING_PINNED);
 
 		tuples_maximum = state.collection->Count();
 	}

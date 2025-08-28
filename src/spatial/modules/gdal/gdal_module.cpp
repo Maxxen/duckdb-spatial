@@ -3,7 +3,6 @@
 // Spatial
 #include "spatial/spatial_types.hpp"
 #include "spatial/geometry/sgl.hpp"
-#include "spatial/geometry/wkb_writer.hpp"
 #include "spatial/geometry/geometry_serialization.hpp"
 #include "spatial/util/function_builder.hpp"
 
@@ -1799,8 +1798,10 @@ struct ST_Write {
 
 		if (type == LogicalType::GEOMETRY()) {
 			const auto blob = value.GetValueUnsafe<string_t>();
-			uint32_t size;
-			const auto wkb = WKBWriter::Write(blob, &size, arena);
+			const auto size = Geometry::ToWKBRequiredSize(blob);
+			const auto wkb = reinterpret_cast<char *>(arena.Allocate(size));
+			Geometry::ToWKB(blob, wkb, size);
+
 			OGRGeometry *ptr;
 			const auto ok = OGRGeometryFactory::createFromWkb(wkb, nullptr, &ptr, size, wkbVariantIso);
 			if (ok != OGRERR_NONE) {

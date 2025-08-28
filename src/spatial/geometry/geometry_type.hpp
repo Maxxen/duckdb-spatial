@@ -115,51 +115,51 @@ public:
 
 	/*
 	bool TryGetCachedBounds(Box2D<float> &bbox) const {
-		Cursor cursor(data);
+	    Cursor cursor(data);
 
-		// Read the header
-		auto header_type = cursor.Read<SpatialGeometryType>();
-		auto properties = cursor.Read<GeometryProperties>();
-		auto hash = cursor.Read<uint16_t>();
-		(void)hash;
+	    // Read the header
+	    auto header_type = cursor.Read<SpatialGeometryType>();
+	    auto properties = cursor.Read<GeometryProperties>();
+	    auto hash = cursor.Read<uint16_t>();
+	    (void)hash;
 
-		// Check the version
-		properties.CheckVersion();
+	    // Check the version
+	    properties.CheckVersion();
 
-		if (properties.HasBBox()) {
-			cursor.Skip(4); // skip padding
+	    if (properties.HasBBox()) {
+	        cursor.Skip(4); // skip padding
 
-			// Now set the bounding box
-			bbox.min.x = cursor.Read<float>();
-			bbox.min.y = cursor.Read<float>();
-			bbox.max.x = cursor.Read<float>();
-			bbox.max.y = cursor.Read<float>();
-			return true;
-		}
+	        // Now set the bounding box
+	        bbox.min.x = cursor.Read<float>();
+	        bbox.min.y = cursor.Read<float>();
+	        bbox.max.x = cursor.Read<float>();
+	        bbox.max.y = cursor.Read<float>();
+	        return true;
+	    }
 
-		if (header_type == SpatialGeometryType::POINT) {
-			cursor.Skip(4); // skip padding
+	    if (header_type == SpatialGeometryType::POINT) {
+	        cursor.Skip(4); // skip padding
 
-			// Read the point
-			auto type = cursor.Read<SerializedGeometryType>();
-			D_ASSERT(type == SerializedGeometryType::POINT);
-			(void)type;
+	        // Read the point
+	        auto type = cursor.Read<SerializedGeometryType>();
+	        D_ASSERT(type == SerializedGeometryType::POINT);
+	        (void)type;
 
-			auto count = cursor.Read<uint32_t>();
-			if (count == 0) {
-				// If the point is empty, there is no bounding box
-				return false;
-			}
+	        auto count = cursor.Read<uint32_t>();
+	        if (count == 0) {
+	            // If the point is empty, there is no bounding box
+	            return false;
+	        }
 
-			const auto x = cursor.Read<double>();
-			const auto y = cursor.Read<double>();
-			bbox.min.x = MathUtil::DoubleToFloatDown(x);
-			bbox.min.y = MathUtil::DoubleToFloatDown(y);
-			bbox.max.x = MathUtil::DoubleToFloatUp(x);
-			bbox.max.y = MathUtil::DoubleToFloatUp(y);
-			return true;
-		}
-		return false;
+	        const auto x = cursor.Read<double>();
+	        const auto y = cursor.Read<double>();
+	        bbox.min.x = MathUtil::DoubleToFloatDown(x);
+	        bbox.min.y = MathUtil::DoubleToFloatDown(y);
+	        bbox.max.x = MathUtil::DoubleToFloatUp(x);
+	        bbox.max.y = MathUtil::DoubleToFloatUp(y);
+	        return true;
+	    }
+	    return false;
 	}
 	*/
 };

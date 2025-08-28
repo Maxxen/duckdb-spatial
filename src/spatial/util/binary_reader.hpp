@@ -15,6 +15,10 @@ public:
 	BinaryReader(const char *buffer, const size_t size) : BinaryReader(buffer, buffer + size) {
 	}
 
+	bool IsAtEnd() const {
+		return ptr >= end;
+	}
+
 	template <class T>
 	T Read() {
 		static_assert(std::is_trivially_copyable<T>::value, "Type must be trivially copyable");

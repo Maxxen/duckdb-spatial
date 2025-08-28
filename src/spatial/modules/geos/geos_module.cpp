@@ -1373,8 +1373,9 @@ struct ST_MaximumInscribedCircle {
 
 	static void Register(ExtensionLoader &loader) {
 
-		const auto result_type = LogicalType::STRUCT(
-		    {{"center", LogicalType::GEOMETRY()}, {"nearest", LogicalType::GEOMETRY()}, {"radius", LogicalType::DOUBLE}});
+		const auto result_type = LogicalType::STRUCT({{"center", LogicalType::GEOMETRY()},
+		                                              {"nearest", LogicalType::GEOMETRY()},
+		                                              {"radius", LogicalType::DOUBLE}});
 
 		FunctionBuilder::RegisterScalar(loader, "ST_MaximumInscribedCircle", [&](ScalarFunctionBuilder &func) {
 			func.AddVariant([&](ScalarFunctionVariantBuilder &variant) {
@@ -2264,8 +2265,8 @@ struct ST_Union_Agg {
 	}
 
 	static void Register(ExtensionLoader &loader) {
-		AggregateFunction agg({LogicalType::GEOMETRY()}, LogicalType::GEOMETRY(), StateSize, Initialize, Update, Combine,
-		                      Finalize, nullptr, nullptr, Destroy);
+		AggregateFunction agg({LogicalType::GEOMETRY()}, LogicalType::GEOMETRY(), StateSize, Initialize, Update,
+		                      Combine, Finalize, nullptr, nullptr, Destroy);
 
 		FunctionBuilder::RegisterAggregate(loader, "ST_Union_Agg", [&](AggregateFunctionBuilder &func) {
 			func.SetFunction(agg);
@@ -2529,8 +2530,8 @@ struct ST_CoverageSimplify_Agg : GEOSCoverageAggFunction {
 	static void Register(ExtensionLoader &loader) {
 		using SELF = ST_CoverageSimplify_Agg;
 
-		AggregateFunction agg({LogicalType::GEOMETRY(), LogicalType::DOUBLE}, LogicalType::GEOMETRY(), StateSize, Initialize,
-		                      Update, Combine, Finalize<SELF>, nullptr, Bind, Destroy);
+		AggregateFunction agg({LogicalType::GEOMETRY(), LogicalType::DOUBLE}, LogicalType::GEOMETRY(), StateSize,
+		                      Initialize, Update, Combine, Finalize<SELF>, nullptr, Bind, Destroy);
 
 		FunctionBuilder::RegisterAggregate(loader, "ST_CoverageSimplify_Agg", [&](AggregateFunctionBuilder &func) {
 			func.SetFunction(agg);
@@ -2690,8 +2691,8 @@ struct ST_CoverageInvalidEdges_Agg : GEOSCoverageAggFunction {
 	static void Register(ExtensionLoader &loader) {
 		using SELF = ST_CoverageInvalidEdges_Agg;
 
-		AggregateFunction agg({LogicalType::GEOMETRY()}, LogicalType::GEOMETRY(), StateSize, Initialize, Update, Combine,
-		                      Finalize<SELF>, nullptr, Bind, Destroy, nullptr);
+		AggregateFunction agg({LogicalType::GEOMETRY()}, LogicalType::GEOMETRY(), StateSize, Initialize, Update,
+		                      Combine, Finalize<SELF>, nullptr, Bind, Destroy, nullptr);
 
 		FunctionBuilder::RegisterAggregate(loader, "ST_CoverageInvalidEdges_Agg", [&](AggregateFunctionBuilder &func) {
 			func.SetFunction(agg);

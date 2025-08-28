@@ -1,10 +1,8 @@
 #include "spatial/modules/main/spatial_functions.hpp"
-#include "spatial/geometry/geometry_processor.hpp"
 #include "spatial/geometry/sgl.hpp"
 #include "spatial/geometry/geometry_serialization.hpp"
 #include "spatial/spatial_types.hpp"
 #include "spatial/util/math.hpp"
-#include "spatial/geometry/wkb_writer.hpp"
 
 #include "duckdb/common/error_data.hpp"
 #include "duckdb/common/operator/cast_operators.hpp"
@@ -126,7 +124,7 @@ struct GeometryCasts {
 	//------------------------------------------------------------------------------------------------------------------
 	static bool ToWKBCast(Vector &source, Vector &result, idx_t count, CastParameters &) {
 		UnaryExecutor::Execute<string_t, string_t>(
-		    source, result, count, [&](const string_t &input) { return WKBWriter::Write(input, result); });
+		    source, result, count, [&](const string_t &input) { return Geometry::ToWKB(input, result); });
 		return true;
 	}
 
@@ -382,7 +380,6 @@ struct PointCasts {
 
 		return true;
 	}
-
 
 	//------------------------------------------------------------------------------------------------------------------
 	// Register

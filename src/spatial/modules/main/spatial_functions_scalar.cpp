@@ -1,8 +1,9 @@
 // Spatial
 #include "spatial/modules/main/spatial_functions.hpp"
 #include "spatial/geometry/geometry_serialization.hpp"
+#include "spatial/geometry/geometry_type.hpp"
+#include "spatial/geometry/vertex.hpp"
 #include "spatial/geometry/sgl.hpp"
-#include "spatial/geometry/wkb_writer.hpp"
 #include "spatial/spatial_types.hpp"
 #include "spatial/util/binary_reader.hpp"
 #include "spatial/util/function_builder.hpp"
@@ -1022,7 +1023,7 @@ struct ST_AsWKB {
 	static void Execute(DataChunk &args, ExpressionState &state, Vector &result) {
 
 		UnaryExecutor::Execute<string_t, string_t>(
-		    args.data[0], result, args.size(), [&](const string_t &input) { return WKBWriter::Write(input, result); });
+		    args.data[0], result, args.size(), [&](const string_t &input) { return Geometry::ToWKB(input, result); });
 	}
 
 	//------------------------------------------------------------------------------------------------------------------
@@ -1066,11 +1067,13 @@ struct ST_AsHEXWKB {
 	// GEOMETRY
 	//------------------------------------------------------------------------------------------------------------------
 	static void Execute(DataChunk &args, ExpressionState &state, Vector &result) {
-		vector<data_t> buffer;
+		vector<char> buffer;
 		UnaryExecutor::Execute<string_t, string_t>(args.data[0], result, args.size(), [&](const string_t &blob) {
 			buffer.clear();
 
-			WKBWriter::Write(blob, buffer);
+			const auto wkb_size = Geometry::ToWKBRequiredSize(blob);
+			buffer.resize(wkb_size);
+			Geometry::ToWKB(blob, buffer.data(), wkb_size);
 
 			auto blob_size = buffer.size() * 2; // every byte is rendered as two characters
 			auto blob_str = StringVector::EmptyString(result, blob_size);
@@ -7816,7 +7819,6 @@ struct ST_Point {
 			func.SetTag("ext", "spatial");
 			func.SetTag("category", "construction");
 		});
-
 
 		FunctionBuilder::RegisterScalar(loader, "ST_MakePoint", [](ScalarFunctionBuilder &func) {
 			func.AddVariant([](ScalarFunctionVariantBuilder &variant) {
