@@ -169,7 +169,7 @@ struct GeometryCasts {
 	//------------------------------------------------------------------------------------------------------------------
 	// Legacy Geometry Cast
 	//------------------------------------------------------------------------------------------------------------------
-	static void GetRequiredSize(BinaryReader &reader, uint32_t &total_size) {
+	static void GetRequiredSizeFromLegacy(BinaryReader &reader, uint32_t &total_size) {
 		reader.Skip(sizeof(uint8_t));
 		const auto flags = reader.Read<uint8_t>();
 		reader.Skip(sizeof(uint16_t));
@@ -231,7 +231,7 @@ struct GeometryCasts {
 		}
 	}
 
-	static void Convert(BinaryReader &reader, BinaryWriter &writer) {
+	static void ConvertFromLegacy(BinaryReader &reader, BinaryWriter &writer) {
 
 		reader.Skip(sizeof(uint8_t));
 		const auto flags = reader.Read<uint8_t>();
@@ -299,21 +299,21 @@ struct GeometryCasts {
 		}
 	}
 
-	static bool FromExtensionGeometry(Vector &source, Vector &result, idx_t count, CastParameters &params) {
+	static bool FromLegacyGeometryCast(Vector &source, Vector &result, idx_t count, CastParameters &params) {
 
 		UnaryExecutor::Execute<string_t, string_t>(
 		    source, result, count, [&](const string_t &input) {
 			    BinaryReader reader(input.GetDataUnsafe(), input.GetSize());
 
 				uint32_t total_size = 0;
-				GetRequiredSize(reader, total_size);
+				GetRequiredSizeFromLegacy(reader, total_size);
 
 		    	reader.Reset();
 
 				auto blob = StringVector::EmptyString(result, total_size);
 		    	BinaryWriter writer(blob.GetDataWriteable(), total_size);
 
-		    	Convert(reader, writer);
+		    	ConvertFromLegacy(reader, writer);
 
 		    	blob.Finalize();
 		    	return blob;
@@ -348,7 +348,7 @@ struct GeometryCasts {
 		loader.RegisterCastFunction(wkb_type, LogicalType::BLOB, DefaultCasts::ReinterpretCast, 1);
 
 		// Always allow casts from extension geometry to the new geometry type for backwards compatability
-		loader.RegisterCastFunction(GeoTypes::EXTENSION_GEOMETRY(), geom_type, FromExtensionGeometry, 0);
+		loader.RegisterCastFunction(GeoTypes::EXTENSION_GEOMETRY(), geom_type, FromLegacyGeometryCast, 0);
 	}
 };
 

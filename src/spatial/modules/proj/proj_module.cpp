@@ -222,16 +222,20 @@ struct ST_Transform {
 	//------------------------------------------------------------------------------------------------------------------
 	struct BindData final : FunctionData {
 		bool normalize = false;
+		string source_crs = "";
+		string target_crs = "";
 
 		unique_ptr<FunctionData> Copy() const override {
 			auto result = make_uniq<BindData>();
 			result->normalize = normalize;
+			result->source_crs = source_crs;
+			result->target_crs = target_crs;
 			return std::move(result);
 		}
 
 		bool Equals(const FunctionData &other) const override {
 			auto &data = other.Cast<BindData>();
-			return normalize == data.normalize;
+			return normalize == data.normalize && source_crs == data.source_crs && target_crs == data.target_crs;
 		}
 	};
 
@@ -248,6 +252,59 @@ struct ST_Transform {
 			}
 			result->normalize = BooleanValue::Get(ExpressionExecutor::EvaluateScalar(ctx, *arg));
 		}
+		return std::move(result);
+	}
+
+	static unique_ptr<FunctionData> TypedBind(ClientContext &ctx, ScalarFunction &func, vector<unique_ptr<Expression>> &args) {
+		auto result = make_uniq<BindData>();
+
+		// Get the source CRS from the input type
+		if (!GeoType::HasCRS(args[0]->return_type)) {
+			throw BinderException("The input geometry must have a defined CRS");
+		}
+		result->source_crs = GeoType::GetCRS(args[0]->return_type);
+		func.arguments[0] = args[0]->return_type;
+
+		// Get the target_crs parameter
+		const auto &target_crs_arg = args[1];
+		if (target_crs_arg->HasParameter()) {
+			throw BinderException("The 'target_crs' parameter must be a constant");
+		}
+		if (!target_crs_arg->IsFoldable()) {
+			throw BinderException("The 'target_crs' parameter must be a constant");
+		}
+		const auto target_crs = StringValue::Get(ExpressionExecutor::EvaluateScalar(ctx, *target_crs_arg));
+		if (target_crs.empty()) {
+			throw BinderException("The 'target_crs' parameter cannot be an empty string");
+		}
+
+		result->target_crs = target_crs;
+
+		// Set the return type based on the input
+		switch (func.return_type.id()) {
+			case LogicalTypeId::GEOMETRY:
+				func.return_type = LogicalType::GEOMETRY(target_crs);
+			break;
+			case LogicalTypeId::GEOGRAPHY:
+				func.return_type = LogicalType::GEOGRAPHY(target_crs);
+			break;
+			default:
+				throw BinderException("ST_Transform can only return GEOMETRY or GEOGRAPHY types");
+		}
+
+		// Get the always_xy parameter if it exists
+		if (args.size() == 3) {
+			// Ensure the "always_xy" parameter is a constant
+			const auto &arg = args[3];
+			if (arg->HasParameter()) {
+				throw BinderException("The 'always_xy' parameter must be a constant");
+			}
+			if (!arg->IsFoldable()) {
+				throw BinderException("The 'always_xy' parameter must be a constant");
+			}
+			result->normalize = BooleanValue::Get(ExpressionExecutor::EvaluateScalar(ctx, *arg));
+		}
+
 		return std::move(result);
 	}
 
@@ -337,6 +394,39 @@ struct ST_Transform {
 
 			    return lstate.Serialize(result, geom);
 		    });
+	}
+
+	//------------------------------------------------------------------------------------------------------------------
+	// Execute (GEOMETRY) Typed, I.e. set the CRS based on the output type
+	//------------------------------------------------------------------------------------------------------------------
+	static void TypedExecuteGeometry(DataChunk &args, ExpressionState &state, Vector &result) {
+		auto &lstate = ProjFunctionLocalState::ResetAndGet(state);
+		auto &alloc = lstate.allocator;
+		auto &func_expr = state.expr.Cast<BoundFunctionExpression>();
+		const auto &info = func_expr.bind_info->Cast<BindData>();
+
+		auto &source_crs = info.source_crs;
+		auto &target_crs = info.target_crs;
+
+		auto crs = lstate.GetOrCreateProjection(source_crs, target_crs, info.normalize);
+
+		UnaryExecutor::Execute<string_t, string_t>(
+			args.data[0], result, args.size(),
+			[&](const string_t &blob) {
+
+				sgl::geometry geom;
+				lstate.Deserialize(blob, geom);
+
+				sgl::ops::transform_vertices(alloc, geom, crs, [](void *arg, sgl::vertex_xyzm &vertex) {
+					const auto crs_ptr = static_cast<PJ *>(arg);
+					const auto transformed =
+						proj_trans(crs_ptr, PJ_FWD, proj_coord(vertex.x, vertex.y, vertex.z, 0)).xy;
+					vertex.x = transformed.x;
+					vertex.y = transformed.y;
+				});
+
+				return lstate.Serialize(result, geom);
+			});
 	}
 
 	//------------------------------------------------------------------------------------------------------------------
@@ -478,6 +568,49 @@ struct ST_Transform {
 				variant.SetBind(Bind);
 				variant.SetFunction(ExecuteGeometry);
 			});
+
+			func.AddVariant([&](ScalarFunctionVariantBuilder &variant) {
+				variant.AddParameter("geom", LogicalType::GEOMETRY());
+				variant.AddParameter("target_crs", LogicalType::VARCHAR);
+				variant.AddParameter("always_xy", LogicalType::BOOLEAN);
+
+				variant.SetReturnType(LogicalType::GEOMETRY());
+				variant.SetInit(ProjFunctionLocalState::Init);
+				variant.SetBind(TypedBind);
+				variant.SetFunction(TypedExecuteGeometry);
+			});
+
+			func.AddVariant([&](ScalarFunctionVariantBuilder &variant) {
+				variant.AddParameter("geom", LogicalType::GEOMETRY());
+				variant.AddParameter("target_crs", LogicalType::VARCHAR);
+				variant.SetReturnType(LogicalType::GEOMETRY());
+				variant.SetInit(ProjFunctionLocalState::Init);
+				variant.SetBind(TypedBind);
+				variant.SetFunction(TypedExecuteGeometry);
+			});
+
+			func.AddVariant([&](ScalarFunctionVariantBuilder &variant) {
+				variant.AddParameter("geog", LogicalType::GEOGRAPHY());
+				variant.AddParameter("target_crs", LogicalType::VARCHAR);
+				variant.AddParameter("always_xy", LogicalType::BOOLEAN);
+				variant.SetReturnType(LogicalType::GEOGRAPHY());
+				variant.SetInit(ProjFunctionLocalState::Init);
+				variant.SetBind(TypedBind);
+				variant.SetFunction(TypedExecuteGeometry);
+			});
+
+			func.AddVariant([&](ScalarFunctionVariantBuilder &variant) {
+				variant.AddParameter("geog", LogicalType::GEOGRAPHY());
+				variant.AddParameter("target_crs", LogicalType::VARCHAR);
+				variant.SetReturnType(LogicalType::GEOGRAPHY());
+				variant.SetInit(ProjFunctionLocalState::Init);
+				variant.SetBind(TypedBind);
+				variant.SetFunction(TypedExecuteGeometry);
+			});
+
+
+
+
 
 			func.SetDescription(DESCRIPTION);
 			func.SetExample(EXAMPLE);
