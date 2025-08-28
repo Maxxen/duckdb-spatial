@@ -1067,13 +1067,15 @@ struct ST_AsHEXWKB {
 	// GEOMETRY
 	//------------------------------------------------------------------------------------------------------------------
 	static void Execute(DataChunk &args, ExpressionState &state, Vector &result) {
-		vector<char> buffer;
+		vector<data_t> buffer;
 		UnaryExecutor::Execute<string_t, string_t>(args.data[0], result, args.size(), [&](const string_t &blob) {
-			buffer.clear();
 
 			const auto wkb_size = Geometry::ToWKBRequiredSize(blob);
+
+			buffer.clear();
 			buffer.resize(wkb_size);
-			Geometry::ToWKB(blob, buffer.data(), wkb_size);
+
+			Geometry::ToWKB(blob, char_ptr_cast(buffer.data()), wkb_size);
 
 			auto blob_size = buffer.size() * 2; // every byte is rendered as two characters
 			auto blob_str = StringVector::EmptyString(result, blob_size);
