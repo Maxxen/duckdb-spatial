@@ -153,6 +153,183 @@ void Serde::Serialize(const sgl::geometry &geom, char *buffer, size_t buffer_siz
 	}
 }
 
+size_t Serde::GetRequiredSizePrepared(const sgl::geometry &geom) {
+
+	const auto root = geom.get_parent();
+	auto part = &geom;
+
+	size_t total_size = 0;
+
+	while (true) {
+		total_size += sizeof(uint8_t);  // LE/BE byte
+		total_size += sizeof(uint32_t); // type id
+		switch (part->get_type()) {
+		case sgl::geometry_type::POINT: {
+			total_size += part->get_vertex_width();
+		} break;
+		case sgl::geometry_type::LINESTRING: {
+			total_size += sizeof(uint32_t) + (part->get_vertex_width() * part->get_vertex_count());
+		} break;
+		case sgl::geometry_type::POLYGON: {
+			total_size += sizeof(uint32_t); // ring count
+			const auto tail = part->get_last_part();
+			if (tail) {
+				auto ring = tail;
+				do {
+					ring = ring->get_next();
+
+					total_size += sizeof(uint32_t); // vertex count
+					if (ring->is_prepared()) {
+
+						// Before we add the vertex size, add the prepared index
+						total_size += sizeof(uint32_t); // levels count;
+
+						auto &prep = static_cast<const sgl::prepared_geometry &>(*ring);
+						for (uint32_t level_idx = 0; level_idx < prep.index.level_count; level_idx++) {
+							const auto &level = prep.index.level_array[level_idx];
+							total_size += sizeof(uint32_t); // entry count
+							total_size += sizeof(sgl::extent_xy) * level.entry_count;
+						}
+					}
+					// Then finally, vertices
+					total_size += (ring->get_vertex_width() * ring->get_vertex_count());
+				} while (ring != tail);
+			}
+		} break;
+		case sgl::geometry_type::MULTI_POINT:
+		case sgl::geometry_type::MULTI_LINESTRING:
+		case sgl::geometry_type::MULTI_POLYGON:
+		case sgl::geometry_type::GEOMETRY_COLLECTION: {
+			total_size += sizeof(uint32_t); // part count
+			if (part->is_empty()) {
+				break;
+			}
+			part = part->get_first_part();
+			continue;
+		}
+		default: {
+			throw InvalidInputException("Cannot serialize geometry of type %d", static_cast<int>(part->get_type()));
+		}
+		}
+
+		while (true) {
+			const auto parent = part->get_parent();
+			if (parent == root) {
+				return total_size;
+			}
+			if (part != parent->get_last_part()) {
+				part = part->get_next();
+				break;
+			}
+			part = parent;
+		}
+	}
+}
+
+void Serde::SerializePrepared(const sgl::geometry &geom, char *buffer, size_t buffer_size) {
+	const auto root = geom.get_parent();
+	auto part = &geom;
+
+	BinaryWriter writer(buffer, buffer_size);
+
+	while (true) {
+		writer.Write<uint8_t>(1); // Little Endian
+
+		// Also write type
+		auto type_id = static_cast<uint32_t>(part->get_type());
+
+		type_id += part->has_z() * 1000;
+		type_id += part->has_m() * 2000;
+
+		if (part->get_type() == sgl::geometry_type::POLYGON) {
+			type_id += 0x00040000;
+		}
+
+		writer.Write<uint32_t>(type_id);
+
+		switch (part->get_type()) {
+		case sgl::geometry_type::POINT: {
+			constexpr auto nan = std::numeric_limits<double>::quiet_NaN();
+			const auto vert_empty = sgl::vertex_xyzm {nan, nan, nan, nan};
+			const auto vert_array =
+			    part->is_empty() ? reinterpret_cast<const char *>(&vert_empty) : part->get_vertex_array();
+			const auto vert_width = part->get_vertex_width();
+
+			writer.Copy(vert_array, vert_width);
+		} break;
+		case sgl::geometry_type::LINESTRING: {
+
+			const auto vert_array = part->get_vertex_array();
+			const auto vert_width = part->get_vertex_width();
+			const auto vert_count = part->get_vertex_count();
+
+			writer.Write<uint32_t>(vert_count);
+			writer.Copy(vert_array, vert_width * vert_count);
+		} break;
+		case sgl::geometry_type::POLYGON: {
+			const auto ring_count = part->get_part_count();
+			writer.Write<uint32_t>(ring_count);
+			const auto tail = part->get_last_part();
+			if (tail) {
+				auto ring = tail;
+				do {
+					ring = ring->get_next();
+
+					const auto vert_array = ring->get_vertex_array();
+					const auto vert_width = ring->get_vertex_width();
+					const auto vert_count = ring->get_vertex_count();
+
+					writer.Write<uint32_t>(vert_count);
+
+					if (ring->is_prepared()) {
+						// Write prepared index
+						auto &prep = static_cast<const sgl::prepared_geometry &>(*ring);
+						writer.Write<uint32_t>(prep.index.level_count);
+						for (uint32_t level_idx = 0; level_idx < prep.index.level_count; level_idx++) {
+							const auto &level = prep.index.level_array[level_idx];
+							writer.Write<uint32_t>(level.entry_count);
+							writer.Copy(reinterpret_cast<const char*>(level.entry_array), sizeof(sgl::extent_xy) * level.entry_count);
+						}
+					}
+
+					writer.Copy(vert_array, vert_width * vert_count);
+
+				} while (ring != tail);
+			}
+		} break;
+		case sgl::geometry_type::MULTI_POINT:
+		case sgl::geometry_type::MULTI_LINESTRING:
+		case sgl::geometry_type::MULTI_POLYGON:
+		case sgl::geometry_type::GEOMETRY_COLLECTION: {
+			const auto part_count = part->get_part_count();
+			writer.Write<uint32_t>(part_count);
+			if (part->is_empty()) {
+				break;
+			}
+			part = part->get_first_part();
+			continue;
+		}
+		default: {
+			throw InvalidInputException("Cannot serialize geometry of type %d", static_cast<int>(part->get_type()));
+		}
+		}
+
+		while (true) {
+			const auto parent = part->get_parent();
+			if (parent == root) {
+				return;
+			}
+			if (part != parent->get_last_part()) {
+				part = part->get_next();
+				break;
+			}
+			part = parent;
+		}
+	}
+}
+
+
+
 template <class GEOM_TYPE = sgl::geometry>
 void Prepare(GEOM_TYPE &type, ArenaAllocator &allocator) {
 }
@@ -184,6 +361,8 @@ static void DeserializeInternal(GEOM_TYPE &result, ArenaAllocator &arena, const 
 		const auto flag = (meta & 0x0000FFFF) / 1000;
 		const auto has_z = (flag & 0x01) != 0;
 		const auto has_m = (flag & 0x02) != 0;
+
+		const auto is_prepped = meta & 0x00040000;
 
 		geom->set_type(type);
 		geom->set_z(has_z);
@@ -217,10 +396,46 @@ static void DeserializeInternal(GEOM_TYPE &result, ArenaAllocator &arena, const 
 				const auto ring = new (ring_mem) GEOM_TYPE(sgl::geometry_type::LINESTRING, has_z, has_m);
 
 				const auto vert_count = reader.Read<uint32_t>();
+
+				if (is_prepped) {
+					if (std::is_same<GEOM_TYPE, sgl::prepared_geometry>::value) {
+						// Read prepared index
+						auto &prep = static_cast<sgl::prepared_geometry &>(*ring);
+						auto &index = prep.index;
+						using level_t = sgl::prepared_geometry::prepared_index::level;
+
+						index.items_count = vert_count;
+						index.level_count = reader.Read<uint32_t>();
+						index.level_array = reinterpret_cast<level_t*>(arena.AllocateAligned(sizeof(level_t) * index.level_count));
+
+						for (uint32_t level_idx = 0; level_idx < index.level_count; level_idx++) {
+							auto &level = index.level_array[level_idx];
+
+							level.entry_count = reader.Read<uint32_t>();
+							level.entry_array = reinterpret_cast<sgl::extent_xy*>(arena.AllocateAligned(sizeof(sgl::extent_xy) * level.entry_count));
+							for (uint32_t entry_idx = 0; entry_idx < level.entry_count; entry_idx++) {
+								level.entry_array[entry_idx] = reader.Read<sgl::extent_xy>();
+							}
+						}
+
+						ring->set_prepared(true);
+					} else {
+						// Skip prepared index
+						const auto level_count = reader.Read<uint32_t>();
+						for (uint32_t level_idx = 0; level_idx < level_count; level_idx++) {
+							const auto entry_count = reader.Read<uint32_t>();
+							// Skip entries
+							reader.Skip((sizeof(double) * 4) * entry_count);
+						}
+					}
+				}
+
 				const auto vert_array = reader.Reserve(vert_count * ring->get_vertex_width());
 				ring->set_vertex_array(vert_array, vert_count);
 
-				Prepare(*ring, arena);
+				if (!is_prepped) {
+					Prepare(*ring, arena);
+				}
 
 				geom->append_part(ring);
 			}
@@ -290,6 +505,8 @@ void Serde::DeserializePrepared(sgl::prepared_geometry &result, ArenaAllocator &
 }
 
 uint32_t Serde::TryGetBounds(const string_t &blob, Box2D<float> &bbox) {
+
+
 	GeometryExtent extent = GeometryExtent::Empty();
 	const auto count = Geometry::GetExtent(blob, extent);
 	if (count == 0) {

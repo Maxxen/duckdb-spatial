@@ -3491,6 +3491,82 @@ bool prepared_geometry::try_get_distance(const prepared_geometry &other, double 
 
 } // namespace sgl
 //======================================================================================================================
+// ST_Within
+//======================================================================================================================
+namespace sgl {
+
+static bool pip_within_poly(const vertex_xy &vert, const geometry &polygon) {
+	SGL_ASSERT(polygon.get_type() == geometry_type::POLYGON);
+	SGL_ASSERT(!polygon.is_empty());
+
+	const auto tail = polygon.get_last_part();
+	auto head = tail;
+	uint32_t ring_idx = 0;
+	do {
+		head = head->get_next();
+
+		const auto result = head->is_prepared() ? reinterpret_cast<const prepared_geometry *>(head)->contains(vert)
+		                                        : vertex_in_ring(vert, *head);
+
+		switch (result) {
+		case point_in_polygon_result::EXTERIOR:
+			if (ring_idx == 0) {
+				return false; // Point is outside the outer ring
+			}
+			// Point is outside a hole, so it is inside the polygon
+			break;
+		case point_in_polygon_result::INTERIOR:
+			if (ring_idx == 0) {
+				// Point is inside the outer ring, continue checking holes
+				break;
+			}
+			// Point is inside a hole, so it is outside the polygon
+			return false;
+		case point_in_polygon_result::BOUNDARY:
+			return true; // Point is on the boundary, considered within
+		default:
+			SGL_ASSERT(false); // Should not happen
+			return false;
+		}
+		ring_idx++;
+	} while (head != tail);
+
+	return true; // Point is inside the polygon
+}
+
+bool ops::pip_within(const geometry &point_geom, const geometry &polygon_geom) {
+	if (point_geom.is_empty() || polygon_geom.is_empty()) {
+		return false; // Empty geometries are never within anything
+	}
+
+	// Get the point
+	vertex_xy point;
+	memcpy(&point, point_geom.get_vertex_array(), sizeof(vertex_xy));
+
+	if (polygon_geom.get_type() == geometry_type::POLYGON) {
+		return pip_within_poly(point, polygon_geom);
+	}
+
+	if (polygon_geom.get_type() == geometry_type::MULTI_POLYGON) {
+
+		const auto tail = polygon_geom.get_last_part();
+		auto head = tail;
+		do {
+			head = head->get_next();
+			if (pip_within_poly(point, *head)) {
+				return true; // Point is within one of the polygons
+			}
+		} while (head != tail);
+		return false; // Point is not within any of the polygons
+	}
+
+	// Needs to be either POLYGON or MULTI_POLYGON
+	SGL_ASSERT(false);
+	return false;
+}
+
+} // namespace sgl
+//======================================================================================================================
 // WKT Parsing
 //======================================================================================================================
 

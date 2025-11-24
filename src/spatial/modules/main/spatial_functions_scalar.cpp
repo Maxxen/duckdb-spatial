@@ -102,6 +102,35 @@ namespace {
 // Functions
 //######################################################################################################################
 
+struct ST_Prepare {
+	static void Execute(DataChunk &args, ExpressionState &state, Vector &result) {
+		auto &lstate = LocalState::ResetAndGet(state);
+		UnaryExecutor::Execute<string_t, string_t>(args.data[0], result, args.size(), [&](const string_t &input) {
+			sgl::prepared_geometry geom;
+			lstate.Deserialize(input, geom);
+
+			auto size = Serde::GetRequiredSizePrepared(geom);
+			auto blob = StringVector::EmptyString(result, size);
+			Serde::SerializePrepared(geom, blob.GetDataWriteable(), size);
+			blob.Finalize();
+
+			return blob;
+		});
+	}
+
+	static void Register(ExtensionLoader &loader) {
+		FunctionBuilder::RegisterScalar(loader, "ST_Prepare", [](ScalarFunctionBuilder &func) {
+			func.AddVariant([](ScalarFunctionVariantBuilder &variant) {
+				variant.AddParameter("geom", LogicalType::GEOMETRY());
+				variant.SetReturnType(LogicalType::GEOMETRY());
+
+				variant.SetInit(LocalState::Init);
+				variant.SetFunction(Execute);
+			});
+		});
+	}
+};
+
 //======================================================================================================================
 // ST_Affine
 //======================================================================================================================
@@ -6282,13 +6311,9 @@ struct ST_IsEmpty {
 	// GEOMETRY
 	//------------------------------------------------------------------------------------------------------------------
 	static void ExecuteGeometry(DataChunk &args, ExpressionState &state, Vector &result) {
-		auto &lstate = LocalState::ResetAndGet(state);
-
 		UnaryExecutor::Execute<string_t, bool>(args.data[0], result, args.size(), [&](const string_t &blob) {
-			sgl::geometry geom;
-			lstate.Deserialize(blob, geom);
-
-			return sgl::ops::get_total_vertex_count(geom) == 0;
+			GeometryExtent ext;
+			return Geometry::GetExtent(blob, ext) == 0;
 		});
 	}
 
@@ -6324,8 +6349,6 @@ struct ST_IsEmpty {
 			func.AddVariant([](ScalarFunctionVariantBuilder &variant) {
 				variant.AddParameter("geom", LogicalType::GEOMETRY());
 				variant.SetReturnType(LogicalType::BOOLEAN);
-
-				variant.SetInit(LocalState::Init);
 				variant.SetFunction(ExecuteGeometry);
 			});
 
@@ -9205,6 +9228,7 @@ void RegisterSpatialScalarFunctions(ExtensionLoader &loader) {
 	ST_M::Register(loader);
 	ST_MMax::Register(loader);
 	ST_MMin::Register(loader);
+	ST_Prepare::Register(loader);
 }
 
 } // namespace duckdb

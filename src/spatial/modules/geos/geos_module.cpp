@@ -2179,13 +2179,35 @@ struct ST_VoronoiDiagram {
 	}
 };
 
-struct ST_Within : AsymmetricPreparedBinaryFunction<ST_Within> {
+struct ST_Within /* : AsymmetricPreparedBinaryFunction<ST_Within>*/ {
 	static bool ExecutePredicateNormal(const GeosGeometry &lhs, const GeosGeometry &rhs) {
 		return lhs.within(rhs);
 	}
 	static bool ExecutePredicatePrepared(const PreparedGeosGeometry &lhs, const GeosGeometry &rhs) {
 		return lhs.within(rhs);
 	}
+
+	static void Execute(DataChunk &args, ExpressionState &state, Vector &result) {
+		auto &lstate = LocalState::ResetAndGet(state);
+
+		BinaryExecutor::Execute<string_t, string_t, bool>(args.data[0], args.data[1], result, args.size(),
+			[&](const string_t &lhs_blob, const string_t &rhs_blob) {
+
+				sgl::prepared_geometry lhs_geom;
+				sgl::prepared_geometry rhs_geom;
+
+				//Serde::DeserializePrepared(lhs_geom, lstate.GetArena(), lhs_blob.GetData(), lhs_blob.GetSize());
+
+				lhs_geom.set_type(sgl::geometry_type::POINT);
+				lhs_geom.set_vertex_array(lhs_blob.GetData() + sizeof(uint8_t) + sizeof(uint32_t), 1);
+
+
+				Serde::DeserializePrepared(rhs_geom, lstate.GetArena(), rhs_blob.GetData(), rhs_blob.GetSize());
+
+				return sgl::ops::pip_within(lhs_geom, rhs_geom);
+		});
+	}
+
 	static void Register(ExtensionLoader &loader) {
 		FunctionBuilder::RegisterScalar(loader, "ST_Within", [](ScalarFunctionBuilder &func) {
 			func.AddVariant([](ScalarFunctionVariantBuilder &variant) {

@@ -707,6 +707,9 @@ void locate_along(allocator &alloc, const geometry &linear_geom, double measure,
 void locate_between(allocator &alloc, const geometry &linear_geom, double measure_beg, double measure_end,
                     double offset, geometry &out_geom);
 
+// Check if point is within (multi)/polygon
+bool pip_within(const geometry &point_geom, const geometry &polygon_geom);
+
 } // namespace ops
 
 // TODO: Move these

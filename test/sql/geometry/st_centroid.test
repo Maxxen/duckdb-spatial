@@ -1,3 +1,6 @@
+# name: test/sql/geometry/st_centroid.test
+# group: [geometry]
+
 require spatial
 
 # Test ST_Centroid for points
