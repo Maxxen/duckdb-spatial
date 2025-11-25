@@ -83,10 +83,12 @@ static bool IsSpatialJoinPredicate(const unique_ptr<Expression> &expr, const uno
 	}
 
 	// The function must operate on two GEOMETRY types
+	/*
 	if (func.children[0]->return_type != LogicalType::GEOMETRY() ||
 	    func.children[1]->return_type != LogicalType::GEOMETRY()) {
 		return false;
 	}
+	*/
 
 	// The function must be a recognized spatial predicate
 	if (spatial_predicate_map.count(func.function.name) == 0) {

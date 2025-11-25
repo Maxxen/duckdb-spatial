@@ -13,7 +13,10 @@
 #include "duckdb/planner/expression/bound_conjunction_expression.hpp"
 #include "duckdb/storage/buffer_manager.hpp"
 #include "spatial/geometry/geometry_serialization.hpp"
+#include "spatial/modules/geos/geos_geometry.hpp"
 #include "spatial/util/math.hpp"
+
+#include <geos_c.h>
 
 namespace duckdb {
 
@@ -507,6 +510,8 @@ public:
 	unique_ptr<FlatRTree> rtree = nullptr;
 
 	mutex combine_lock;
+
+	vector<unique_ptr<ExpressionExecutor>> key_executors;
 };
 
 unique_ptr<GlobalSinkState> PhysicalSpatialJoin::GetGlobalSinkState(ClientContext &context) const {
@@ -521,13 +526,16 @@ class SpatialJoinLocalState final : public LocalSinkState {
 public:
 	SpatialJoinLocalState(const PhysicalSpatialJoin &op, ClientContext &context,
 	                      const shared_ptr<TupleDataLayout> &layout)
-	    : build_side_key_executor(context), build_side_filter_executor(context) {
+	    : build_side_filter_executor(context) {
+
+		build_side_key_executor = make_uniq<ExpressionExecutor>(context);
+
 		// Dont keep the tuples in memory after appending.
 		collection = make_uniq<TupleDataCollection>(BufferManager::GetBufferManager(context), layout);
 		collection->InitializeAppend(append_state, TupleDataPinProperties::UNPIN_AFTER_DONE);
 
 		// TODO: Add other join condition expressions here
-		build_side_key_executor.AddExpression(*op.build_side_key);
+		build_side_key_executor->AddExpression(*op.build_side_key);
 		build_side_key_chunk.Initialize(context, op.build_side_key_types);
 
 		build_side_row_chunk.InitializeEmpty(layout->GetTypes());
@@ -569,7 +577,7 @@ public:
 	// Referencing DataChunk chunk, having the same layout as the collection
 	DataChunk build_side_row_chunk;
 	// Used to execute the build side join key expression
-	ExpressionExecutor build_side_key_executor;
+	unique_ptr<ExpressionExecutor> build_side_key_executor;
 
 	// Used to count how many non-null and non-empty geometries we have on the build side
 	// (so we can initialize the rtree to the correct size)
@@ -591,11 +599,11 @@ SinkResultType PhysicalSpatialJoin::Sink(ExecutionContext &context, DataChunk &c
 	auto &lstate = input.local_state.Cast<SpatialJoinLocalState>();
 
 	lstate.build_side_key_chunk.Reset();
-	lstate.build_side_key_executor.Execute(chunk, lstate.build_side_key_chunk);
+	lstate.build_side_key_executor->Execute(chunk, lstate.build_side_key_chunk);
 
 	// Count how many non-null and non-empty geometries we have on the build side
-	lstate.build_side_non_null_non_empty_count +=
-	    lstate.build_side_filter_executor.SelectExpression(lstate.build_side_key_chunk, lstate.build_side_filter_sel);
+	lstate.build_side_non_null_non_empty_count += lstate.build_side_key_chunk.size();
+	    // lstate.build_side_filter_executor.SelectExpression(lstate.build_side_key_chunk, lstate.build_side_filter_sel);
 
 	if (build_side_payload_types.empty()) {
 		// There are only keys. Make the payload chunk empty
@@ -641,6 +649,9 @@ SinkCombineResultType PhysicalSpatialJoin::Combine(ExecutionContext &context, Op
 	// Merge the non-null and non-empty count
 	gstate.total_rtree_size += lstate.build_side_non_null_non_empty_count;
 
+	// Keep the executor around so the local state stays alive
+	gstate.key_executors.emplace_back(std::move(lstate.build_side_key_executor));
+
 	return SinkCombineResultType::FINISHED;
 }
 
@@ -665,7 +676,7 @@ SinkFinalizeType PhysicalSpatialJoin::Finalize(Pipeline &pipeline, Event &event,
 	Vector row_pointer_vector(LogicalType::POINTER, reinterpret_cast<data_ptr_t>(rows_ptr));
 
 	auto &sel = *FlatVector::IncrementalSelectionVector();
-	Vector geom_vec(LogicalType::GEOMETRY());
+	Vector geom_vec(LogicalType::POINTER);
 	auto &validity = FlatVector::Validity(geom_vec);
 
 	do {
@@ -680,7 +691,7 @@ SinkFinalizeType PhysicalSpatialJoin::Finalize(Pipeline &pipeline, Event &event,
 		gstate.collection->Gather(row_pointer_vector, sel, row_count, build_side_key_col, geom_vec, sel, nullptr);
 
 		// Get a pointer to what we just gathered
-		const auto geom_ptr = FlatVector::GetData<string_t>(geom_vec);
+		const auto geom_ptr = FlatVector::GetData<data_ptr_t>(geom_vec);
 		// Push the bounding boxes into the R-Tree
 		for (idx_t row_idx = 0; row_idx < row_count; row_idx++) {
 			if (!validity.RowIsValid(row_idx)) {
@@ -688,12 +699,15 @@ SinkFinalizeType PhysicalSpatialJoin::Finalize(Pipeline &pipeline, Event &event,
 				continue;
 			}
 
-			const auto &geom = geom_ptr[row_idx];
+			const auto geom = reinterpret_cast<PreparedGeosGeometry*>(geom_ptr[row_idx]);
+			double min_x, min_y, max_x, max_y;
+			geom->get_extent(min_x, min_y, max_x, max_y);
+
 			Box2D<float> bbox;
-			if (!Serde::TryGetBounds(geom, bbox)) {
-				// Skip empty geometries
-				continue;
-			}
+			bbox.min.x = MathUtil::DoubleToFloatDown(min_x);
+			bbox.min.y = MathUtil::DoubleToFloatDown(min_y);
+			bbox.max.x = MathUtil::DoubleToFloatUp(max_x);
+			bbox.max.y = MathUtil::DoubleToFloatUp(max_y);
 
 			if (has_const_distance) {
 				// If this is a ST_DWithin join, we need to expand the bounding box by the constant distance

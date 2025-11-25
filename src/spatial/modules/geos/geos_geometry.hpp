@@ -1,6 +1,7 @@
 #pragma once
 
 #include "geos_c.h"
+#include "duckdb/common/mutex.hpp"
 
 #include "duckdb/common/vector.hpp"
 
@@ -182,6 +183,7 @@ public:
 	~PreparedGeosGeometry();
 
 public:
+	bool contains(const GeosGeometry &other);
 	bool contains(const GeosGeometry &other) const;
 	bool contains_properly(const GeosGeometry &other) const;
 	bool covers(const GeosGeometry &other) const;
@@ -196,7 +198,13 @@ public:
 	double distance_to(const GeosGeometry &other) const;
 	bool distance_within(const GeosGeometry &other, double distance) const;
 
+	void get_extent(double &xmin, double &ymin, double &xmax, double &ymax) const {
+		GEOSGeom_getExtent_r(handle, base, &xmin, &ymin, &xmax, &ymax);
+	}
+
 private:
+	mutex lock;
+	const GEOSGeometry *base;
 	GEOSContextHandle_t handle;
 	const GEOSPreparedGeometry *prepared;
 };
@@ -234,10 +242,13 @@ inline GeosGeometry::~GeosGeometry() {
 inline PreparedGeosGeometry::PreparedGeosGeometry(GEOSContextHandle_t handle_p, const GeosGeometry &geom)
     : handle(handle_p) {
 	prepared = GEOSPrepare_r(handle, geom.geom);
+	base = geom.geom;
 }
+
 inline PreparedGeosGeometry::PreparedGeosGeometry(PreparedGeosGeometry &&other) noexcept
-    : handle(other.handle), prepared(other.prepared) {
+    : base(other.base), handle(other.handle), prepared(other.prepared) {
 	other.prepared = nullptr;
+	other.base = nullptr;
 }
 
 inline PreparedGeosGeometry &PreparedGeosGeometry::operator=(PreparedGeosGeometry &&other) noexcept {
@@ -525,6 +536,11 @@ inline PreparedGeosGeometry GeosGeometry::get_prepared() const {
 }
 
 //-- PreparedGeosGeometry --//
+
+inline bool PreparedGeosGeometry::contains(const GeosGeometry &other) {
+	lock_guard<mutex> guard(lock);
+	return GEOSPreparedContains_r(handle, prepared, other.geom);
+}
 
 inline bool PreparedGeosGeometry::contains(const GeosGeometry &other) const {
 	return GEOSPreparedContains_r(handle, prepared, other.geom);

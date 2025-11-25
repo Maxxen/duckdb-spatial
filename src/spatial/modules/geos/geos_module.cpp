@@ -11,6 +11,8 @@
 #include "spatial/geometry/geometry_serialization.hpp"
 #include "spatial/geometry/sgl.hpp"
 
+#include <list>
+
 namespace duckdb {
 
 //------------------------------------------------------------------------------
@@ -29,6 +31,11 @@ public:
 	static LocalState &ResetAndGet(ExpressionState &state) {
 		auto &local_state = ExecuteFunctionState::GetFunctionState(state)->Cast<LocalState>();
 		local_state.arena.Reset();
+		return local_state;
+	}
+
+	static LocalState &GetButDontReset(ExpressionState &state) {
+		auto &local_state = ExecuteFunctionState::GetFunctionState(state)->Cast<LocalState>();
 		return local_state;
 	}
 
@@ -54,7 +61,9 @@ public:
 	~LocalState() override {
 		GEOS_finish_r(ctx);
 	}
-
+public:
+	std::list<GeosGeometry> temp_geometries;
+	std::list<PreparedGeosGeometry> temp_prepared_geometries;
 private:
 	ArenaAllocator arena;
 	GEOSContextHandle_t ctx;
@@ -2186,6 +2195,19 @@ struct ST_Within : AsymmetricPreparedBinaryFunction<ST_Within> {
 	static bool ExecutePredicatePrepared(const PreparedGeosGeometry &lhs, const GeosGeometry &rhs) {
 		return lhs.within(rhs);
 	}
+
+	static void ExecutePrep(DataChunk &args, ExpressionState &state, Vector &result) {
+		auto &lstate = LocalState::ResetAndGet(state);
+
+		BinaryExecutor::Execute<string_t, data_ptr_t, bool>(
+		    args.data[0], args.data[1], result, args.size(),
+		    [&](const string_t &lhs_blob, const data_ptr_t rhs_ptr) {
+		    	const auto lhs = lstate.Deserialize(lhs_blob);
+		    	const auto rhs = reinterpret_cast<PreparedGeosGeometry *>(rhs_ptr);
+		    	return rhs->contains(lhs);
+		    });
+	}
+
 	static void Register(ExtensionLoader &loader) {
 		FunctionBuilder::RegisterScalar(loader, "ST_Within", [](ScalarFunctionBuilder &func) {
 			func.AddVariant([](ScalarFunctionVariantBuilder &variant) {
@@ -2195,6 +2217,15 @@ struct ST_Within : AsymmetricPreparedBinaryFunction<ST_Within> {
 
 				variant.SetInit(LocalState::Init);
 				variant.SetFunction(Execute);
+			});
+
+			func.AddVariant([](ScalarFunctionVariantBuilder &variant) {
+				variant.AddParameter("geom1", LogicalType::GEOMETRY());
+				variant.AddParameter("geom2", LogicalType::POINTER);
+				variant.SetReturnType(LogicalType::BOOLEAN);
+
+				variant.SetInit(LocalState::Init);
+				variant.SetFunction(ExecutePrep);
 			});
 
 			func.SetDescription("Returns true if the first geometry is within the second");
@@ -2979,6 +3010,38 @@ struct ST_CoverageInvalidEdges_Agg : GEOSCoverageAggFunction {
 	}
 };
 
+
+struct ST_Prepare {
+	static void Execute(DataChunk &args, ExpressionState &state, Vector &result) {
+		auto &lstate = LocalState::GetButDontReset(state);
+
+		UnaryExecutor::Execute<string_t, data_ptr_t>(args.data[0], result, args.size(), [&](const string_t &geom_blob) {
+
+			// Move into the temp dequeue
+			lstate.temp_geometries.emplace_back(lstate.Deserialize(geom_blob));
+			lstate.temp_prepared_geometries.emplace_back(lstate.temp_geometries.back().get_prepared());
+
+			return reinterpret_cast<data_ptr_t>(&lstate.temp_prepared_geometries.back());
+		});
+	}
+
+	static void Register(ExtensionLoader &loader) {
+		FunctionBuilder::RegisterScalar(loader, "ST_Prepare", [](ScalarFunctionBuilder &func) {
+			func.AddVariant([](ScalarFunctionVariantBuilder &variant) {
+				variant.AddParameter("geom", LogicalType::GEOMETRY());
+				variant.SetReturnType(LogicalType::POINTER);
+
+				variant.SetInit(LocalState::Init);
+				variant.SetFunction(Execute);
+			});
+
+			func.SetDescription("Prepares a geometry for faster spatial operations");
+			func.SetTag("ext", "spatial");
+			func.SetTag("category", "utility");
+		});
+	}
+};
+
 } // namespace
 
 //######################################################################################################################
@@ -3043,6 +3106,8 @@ void RegisterGEOSModule(ExtensionLoader &loader) {
 	ST_CoverageInvalidEdges_Agg::Register(loader);
 	ST_CoverageUnion_Agg::Register(loader);
 	ST_CoverageSimplify_Agg::Register(loader);
+
+	ST_Prepare::Register(loader);
 }
 
 } // namespace duckdb
