@@ -8,8 +8,9 @@
 #if SPATIAL_USE_GEOS
 #include "spatial/modules/geos/geos_module.hpp"
 #endif
+#include "spatial/modules/prep/prep_module.hpp"
 #include "spatial/modules/mvt/mvt_module.hpp"
-#include "operators/spatial_operator_extension.hpp"
+#include "spatial/operators/spatial_operator_extension.hpp"
 #include "spatial/modules/main/spatial_functions.hpp"
 #include "spatial/modules/osm/osm_module.hpp"
 #include "spatial/modules/proj/proj_module.hpp"
@@ -41,6 +42,7 @@ static void LoadInternal(ExtensionLoader &loader) {
 	RegisterShapefileModule(loader);
 	RegisterMapboxVectorTileModule(loader);
 	RegisterWKBModule(loader);
+	RegisterPrepModule(loader);
 
 	RTreeModule::RegisterIndex(loader);
 	RTreeModule::RegisterIndexPragmas(loader);

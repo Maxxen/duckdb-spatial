@@ -52,6 +52,21 @@ public:
 		return end;
 	}
 
+	char* GetPtr() const {
+		return ptr;
+	}
+
+	size_t GetPosition() const {
+		return ptr - beg;
+	}
+	void SetPosition(const size_t position) {
+		if (beg + position > end) {
+			throw InternalException("Buffer overflow");
+		}
+		ptr = beg + position;
+	}
+
+
 private:
 	void CheckSize(const size_t size) const {
 		if (ptr + size > end) {
